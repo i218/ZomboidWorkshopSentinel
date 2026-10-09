@@ -88,7 +88,7 @@ public final class SentinelTests {
             zombie.network.GameServer.server = false;
             Main.main(new String[0]);
             eq(me.zed_0xff.zombie_buddy.Exposer.exposed, WorkshopSentinelBridge.class);
-            eq(me.zed_0xff.zombie_buddy.Exposer.alias, "WorkshopSentinelBridge");
+            eq(me.zed_0xff.zombie_buddy.Exposer.alias, null);
             WorkshopSentinelBridge.onTick();
             eq(serviceField.get(null), null);
             zombie.network.GameServer.server = true;

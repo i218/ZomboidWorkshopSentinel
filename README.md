@@ -8,7 +8,7 @@ A mod for **Project Zomboid Build 42 Dedicated Server** with ZombieBuddy install
 
 ## One mod for the client and server
 
-**WorkshopSentinel 0.4.7 uses one folder, one mod ID, and one package.** It contains a Java server monitor, a Lua client update checker, and support for the server settings editor with MLOS. The runtime environment determines which code runs.
+**WorkshopSentinel 0.4.8 uses one folder, one mod ID, and one package.** It contains a Java server monitor, a Lua client update checker, and support for the server settings editor with MLOS. The runtime environment determines which code runs.
 
 ### Windows installation
 
@@ -233,3 +233,15 @@ powershell -NoProfile -File installer/test-client.ps1 -GameDirectory "PATH_TO_Pr
 Set `JAVA_HOME` to JDK 11 or newer. These tests use the installed game's Kahlua runtime and standard library with Steam/UI test doubles; they do not start the game.
 
 For an in-game check, enable WorkshopSentinel, open **Mod updates**, disable **Show changed mods only**, and inspect the list, version, changelog, and both link actions. After the first successful scan, the cache should appear in the data folder's `Lua` directory. On the next run, new timestamps or versions should be marked as changes. Normal installation does not create simulated update events.
+
+### Bridge compatibility (0.4.8)
+
+The Java bridge uses ZombieBuddy's default class exposure. This fixes `Java bridge missing` caused by a same-name alias in ZombieBuddy 2.3.4. Update the server with the new installer and restart it normally. Signing remains disabled; keep the normal ZombieBuddy approval flow.
+
+To verify exposure against your installed game and ZombieBuddy without starting a server:
+
+```powershell
+.\installer\test-bridge.ps1 -GameDirectory '<Project Zomboid folder>' -ZombieBuddyJar '<ZombieBuddy.jar path>'
+```
+
+The test requires a JDK via `JAVA_HOME` and uses the game's Java runtime.

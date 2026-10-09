@@ -14,14 +14,11 @@ public final class Main {
         if (registered) return;
         try {
             Class<?> exposer = Class.forName("me.zed_0xff.zombie_buddy.Exposer");
-            try {
-                exposer.getMethod("exposeClass", Class.class, String.class)
-                    .invoke(null, WorkshopSentinelBridge.class, "WorkshopSentinelBridge");
-            } catch (NoSuchMethodException olderVersion) {
-                exposer.getMethod("exposeClass", Class.class).invoke(null, WorkshopSentinelBridge.class);
-            }
+            // ZB 2.3.4 deletes a same-name alias while renaming the exposed table.
+            // Default exposure retains the canonical global WorkshopSentinelBridge.
+            exposer.getMethod("exposeClass", Class.class).invoke(null, WorkshopSentinelBridge.class);
             registered = true;
-            LOG.info("Java bridge registered v0.4.7; awaiting server OnTick. Dedicated-server guard is deferred until tick.");
+            LOG.info("Java bridge registered v0.4.8; awaiting server OnTick. Dedicated-server guard is deferred until tick.");
         } catch (Exception e) {
             LOG.log(Level.SEVERE, "ZombieBuddy Exposer API unavailable; mod disabled. TODO verify deployed ZombieBuddy version", e);
         }
