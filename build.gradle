@@ -66,7 +66,7 @@ tasks.register('modZip', Zip) {
         into('common') { from('common') }
         into('config') { from('config') }
         into('docs') { from('docs') }
-        from('README.md', 'VERIFICATION.md')
+        from('README.md', 'README.ru.md', 'VERIFICATION.md')
     }
     exclude '**/.gitkeep'
 }

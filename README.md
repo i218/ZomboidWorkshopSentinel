@@ -1,79 +1,93 @@
 # WorkshopSentinel
 
-Мод для **Project Zomboid Build 42 Dedicated Server** с установленным ZombieBuddy. Проверяет обновления Workshop и выбирает время для запроса перезапуска.
+**English** | [Русский](README.ru.md)
 
-**По умолчанию включён тестовый режим: сервер продолжает работать.**
+A mod for **Project Zomboid Build 42 Dedicated Server** with ZombieBuddy installed. It monitors Workshop updates and decides when to request a restart. The same package provides automatic client update notifications.
 
-## Один мод для клиента и сервера
+**Dry-run is enabled by default: the server keeps running.**
 
-**WorkshopSentinel 0.4.7 — одна папка, один ID, один пакет.** Она содержит серверный Java-монитор, клиентскую проверку обновлений и обработчик редактора настроек с поддержкой MLOS. Одинаковую папку можно использовать для клиента и dedicated server: среда выбирает исполняемый код.
+## One mod for the client and server
 
-### Установка в Windows
+**WorkshopSentinel 0.4.7 uses one folder, one mod ID, and one package.** It contains a Java server monitor, a Lua client update checker, and support for the server settings editor with MLOS. The runtime environment determines which code runs.
 
-1. Запустите **WorkshopSentinel-Setup.exe** после закрытия игры или сервера.
-2. Выберите одну **папку данных Zomboid**, обычно `%USERPROFILE%/Zomboid`. При использовании `-cachedir` выберите указанный там путь. Это не папка установленной игры.
-3. Выберите установку для клиента, сервера или обоих. Для сервера выберите существующий профиль, например `servertest1`.
-4. Нажмите **Установить** и запустите игру или сервер заново. Установщик включает клиентский мод и добавляет ZombieBuddy/WorkshopSentinel в выбранный server.ini сам.
+### Windows installation
 
-Установщик сохраняет существующий конфиг. Новый конфиг имеет `dryRun=true` и `shutdownEnabled=false`. При обновлении файлы существующего мода копируются в `<папка данных>/WorkshopSentinel-installer-backups/`, затем заменяются по одному без переноса папки мода. При ошибке заменённые файлы восстанавливаются; если восстановление тоже блокируется, установщик сообщает путь к резервной копии. Выбранный server.ini и клиентский `mods/default.txt` обновляются автоматически с резервной копией. Остальные моды, карты, WorkshopItems и настройки сохраняются. Имя сервера определяется через GameServer.serverName; Java-параметр имени больше не нужен. JAR встроен в EXE, проверяется перед установкой и после распаковки по SHA-256. Отчёт сохраняется в `<папка данных>/WorkshopSentinel-installation.txt`. При конфликте с ServerAutoUpdate_B42 или неоднозначных настройках установка останавливается до замены файлов.
+1. Close the game or server, then run **WorkshopSentinel-Setup.exe**.
+2. Select your **Zomboid data folder**, usually `%USERPROFILE%/Zomboid`. If you use `-cachedir`, select that folder. This is the data folder, not the game installation folder.
+3. Choose installation for the client, server, or both. For a server, select an existing profile, such as `servertest1`.
+4. Click **Install** (currently labelled **Установить**) and start the game or server again. The installer enables the client mod and adds ZombieBuddy and WorkshopSentinel to the selected server's `Mods` list automatically.
 
-Если установка не удалась, окно показывает операцию, точный путь и расположение отчёта `WorkshopSentinel-setup-error-*.txt` в системной временной папке. Закройте игру и сервер перед повторной установкой: права администратора не снимают блокировки открытых файлов.
+The JAR is embedded in the EXE, validated before installation, and checked by SHA-256 after extraction. No separate JAR download or copying is needed. Existing configuration is preserved; a new configuration uses `dryRun=true` and `shutdownEnabled=false`. The server name is read from `GameServer.serverName`, so no extra Java argument is required.
 
-### Ручная установка и Linux
+The selected server `.ini` and client `mods/default.txt` are updated with backups. Other mods, maps, `WorkshopItems`, and settings are preserved. Existing mod files are backed up under `<data folder>/WorkshopSentinel-installer-backups/` and replaced individually without moving the mod folder. Files changed during a failed deployment are restored; if restoration is also blocked, the installer reports the backup location.
 
-Распакуйте **WorkshopSentinel-mod.zip** в `<папка данных>/mods/`. Это тот же единый мод, который находится внутри установщика. Отдельный клиентский каталог больше не нужен; старую копию с тем же ID следует заменить, а не держать рядом.
+Installation stops before replacing files if `ServerAutoUpdate_B42` is enabled or the settings cannot be parsed unambiguously. A report is saved to `<data folder>/WorkshopSentinel-installation.txt`.
 
-### Подпись ZombieBuddy
+If installation fails, the dialog shows the operation, exact path, and location of a `WorkshopSentinel-setup-error-*.txt` report in the system temporary folder. Close the game and server before retrying: administrator privileges do not release locks on open files.
 
-Подпись отложена: текущая поставка неподписанная. Профиль Steam менять не нужно; при запросе ZombieBuddy подтвердите обычную загрузку JAR. Прежняя `.jar.zbs`, если она установлена, переносится в резервную папку вне mods. Ключ сохранён отдельно на будущее, в Git и поставку не входит. [Справка по отложенной подписи](docs/SIGNING.md).
+### Manual installation and Linux
 
-### Что загружается
+Extract **WorkshopSentinel-mod.zip** into `<data folder>/mods/`. It contains the same unified mod as the installer. Replace any old copy with the same mod ID rather than keeping both copies.
 
-- **Клиент:** проверка Workshop и обработчик редактора из `media/lua/client`. Он сохраняет существующий локальный WorkshopSentinel при сохранении через MLOS без выдуманного Workshop ID. Java agent на клиенте для этого не нужен.
-- **Dedicated server:** Java bootstrap из `media/java/WorkshopSentinel.jar` через ZombieBuddy и серверный Lua-мост. Монитор проверяет `GameServer.server` на первом серверном tick и только затем запускается. Клиентский обработчик там не выполняется.
+### ZombieBuddy signing
 
-В 0.4.1 нейтральный путь JAR заменяет старый `media/java/server`: в предоставленном логе Build 42.21.0 ZombieBuddy 2.3.4 ошибочно пропускал server-only JAR при загрузке dedicated server. На клиенте с установленным ZombieBuddy минимальный Java bootstrap теперь тоже может загружаться и требовать одобрения, но сервис мониторинга, scheduler и остановка там не запускаются. Клиентский интерфейс работает и без Java agent.
+Signing is deferred; the current release is unsigned. You do not need to change your Steam profile. Approve the JAR through ZombieBuddy's normal approval prompt when requested.
 
-Установщик 0.4.1 отключает обнаружение старых `.WorkshopSentinel-install-*` копий с ID WorkshopSentinel: переносит только их `42/mod.info` в резервную папку, сохраняя остальные файлы. Поэтому игра выбирает актуальную папку WorkshopSentinel. Другие моды не изменяются.
+An older `.jar.zbs`, if installed, is moved to a backup folder outside `mods`. The private signing key is stored separately for possible future use and is excluded from Git and distribution packages. See the [deferred signing notes](docs/SIGNING.md).
 
-Для работы обработчика с MLOS включите WorkshopSentinel в основном меню Mods. В логах появится `MLOS compatibility enabled: local mod retained without Workshop ID`. Файлы MLOS не меняются.
+### What runs in each environment
 
-`clientOptional=true` исключает только WorkshopSentinel из объявляемых сервером требований после первого tick. Проверка подключения игрока без мода и Lua-контрольных сумм **единого пакета** ещё требуется в настоящем игровом процессе. У локального мода нет Workshop ID; добавление опубликованного item в `WorkshopItems` может потребовать его скачивание независимо от списка Mods.
+- **Client:** the Workshop checker and settings editor support in `media/lua/client`. MLOS support keeps an existing local WorkshopSentinel mod in the saved configuration without inventing a Workshop ID. These features do not need a client Java agent.
+- **Dedicated server:** the Java bootstrap at `media/java/WorkshopSentinel.jar`, loaded through ZombieBuddy, and the server Lua bridge. The monitor checks `GameServer.server` on the first server tick before starting. Client Lua does not run there.
 
-Пакет готов для локальной установки. Публикация в Steam Workshop в этой поставке не выполнялась.
+Since 0.4.1, the JAR uses a neutral path instead of `media/java/server`. In the supplied Build 42.21.0 server log, ZombieBuddy 2.3.4 incorrectly skipped the server-only JAR during dedicated server startup. With ZombieBuddy on the client, the minimal Java bootstrap may now load and request approval there too, but it does not start monitoring, a scheduler, or shutdown. The client UI works without a Java agent.
 
-## Проверка обновлений на клиенте
+The installer disables discovery of legacy `.WorkshopSentinel-install-*` copies with the WorkshopSentinel ID by moving only their `42/mod.info` into a backup folder. It preserves the remaining files and does not alter other mods.
 
-Проверка запускается сама при входе в главное меню и затем каждые **20 минут**. При новых изменениях автоматически открывается компактное окно со списком модов и подробностями; кнопки «Проверить» нет. Одно и то же уведомление после закрытия не появляется повторно. Во время игры новые проверки и всплывающие окна отложены до возвращения в меню. Кнопка **«Обновления модов»** открывает уже полученный результат без обращения к Steam. В **Mod Options → WorkshopSentinel** можно отключить автоматическое окно или изменить фильтр; для работы мода настройки не нужны.
+For MLOS support, enable WorkshopSentinel in the main Mods menu; the client installer does this automatically. The log should show `MLOS compatibility enabled: local mod retained without Workshop ID`. MLOS files are not modified.
 
-Проверяются только активные Workshop-моды; локальные моды пропускаются. В окне доступны текущие версии из mod.info, состояние Steam, дата обновления Steam, локальный ChangeLog.txt, открытие страницы в Steam Overlay и копирование ссылки. Поддержаны русские и английские подписи. ChangeLog читается из версии мода либо common штатным reader игры и показывается как обычный текст.
+`clientOptional=true` removes only WorkshopSentinel from the server's advertised client requirements after the first tick. Connecting without the unified mod and Lua checksum behavior **still need verification in a real game session**. A local mod has no Workshop ID; adding a published item to `WorkshopItems` may require downloading it independently of the `Mods` list.
 
-Первая проверка создаёт точку отсчёта. Затем сравниваются дата Steam и версии из mod.info; отдельным признаком показывается `NeedsUpdate`, сообщённый Steam. Изменение даты публикации может относиться к метаданным, поэтому список не обещает, что изменился код или уже скачалась новая сборка. Успешная проверка сохраняет кеш в `<папка данных>/Lua/WorkshopSentinel-client-cache.txt`; неполный ответ или ошибка Steam не обновляют его. Новый сеанс сравнивается с последней успешной проверкой предыдущего сеанса.
+The package is ready for local installation. It has not been published to Steam Workshop.
 
-Клиент проверяет каждые 20 минут, отправляя пакеты до 100 уникальных Workshop ID с паузой 4 секунды. Ошибки и пустой список не вызывают непрерывных повторов; следующая попытка выполняется по таймеру. Таймаут ответа — 30 секунд. Проверка информационная: она не скачивает файлы, не перезапускает игру и не отправляет команд серверу.
+## Client update checking
 
-Это самостоятельная реализация функций, описанных в [Workshop Update Checker](https://steamcommunity.com/sharedfiles/filedetails/?id=3628835042). Чужой код и ресурсы не включены. В описании оригинала нет фиксированного автоматического интервала: указана проверка по кнопке и пауза около 4 секунд между партиями. Интервал 20 минут выбран для WorkshopSentinel. Исходный WorkshopUpdateCheck не требуется; при одновременном включении его уведомления могут дублироваться.
+Checks run automatically on entering the main menu and then every **20 minutes**. New changes open a compact window with a mod list and details. There is no Check button. Dismissing a notification prevents the same changes from opening it again.
 
-## Конфликты и порядок загрузки
+New checks and popups are deferred during gameplay until you return to the menu. The **Mod updates** menu button opens existing results without querying Steam. **Mod Options → WorkshopSentinel** lets you disable automatic popups or change the filter; no configuration is needed for normal operation.
 
-В mod.info заданы `loadModAfter=\ZombieBuddy,\ModLoadOrderSorter_b42` и `incompatible=\ServerAutoUpdate_B42`. Обе работы — [Server AutoUpdate](https://steamcommunity.com/sharedfiles/filedetails/?id=3756814990) и [Server AutoUpdate - Update Restart](https://steamcommunity.com/sharedfiles/filedetails/?id=3781306534) — используют один Mod ID `ServerAutoUpdate_B42`. Поэтому одна запись охватывает обе. Указан конфликт по назначению: не следует одновременно включать независимые контроллеры перезапуска. Перед включением WorkshopSentinel уберите ServerAutoUpdate_B42 из активного списка и серверного Mods; метаданные не редактируют ваш ini автоматически.
+Only active Workshop mods are checked; local mods are skipped. The window shows versions from `mod.info`, Steam state, the Steam update date, and a local `ChangeLog.txt`. It can open the item in the Steam Overlay or copy its link. English and Russian UI text are supported. The game reader loads changelogs from the mod's version folder or `common`, and the UI displays them as plain text.
 
-## Как это работает
+The first successful check establishes a baseline. Later checks compare Steam timestamps and `mod.info` versions; Steam's `NeedsUpdate` state is shown separately. A changed timestamp can reflect Workshop metadata, so the list does not prove that code changed or that a new build has been downloaded.
 
-1. Каждые **5 минут** проверяет работы из `WorkshopItems` вашего сервера.
-2. Если найдено обновление и игроков нет — создаёт запрос перезапуска.
-3. Если игроки есть — проверяет их количество каждую **минуту**.
-4. Через **30 минут** ожидания предупреждает игроков в чате и даёт ещё **5 минут** на безопасный выход.
+Successful checks save the cache to `<data folder>/Lua/WorkshopSentinel-client-cache.txt`. Steam errors or incomplete results do not overwrite it. A new session compares against the last successful check from the previous session.
 
-Если сервер опустеет раньше, запрос будет создан при следующей проверке игроков. Ошибки Steam не сбрасывают таймер; ошибка подсчёта игроков откладывает остановку.
+Requests use batches of up to 100 unique Workshop IDs, spaced 4 seconds apart. Failed checks and empty lists wait for the next scheduled check instead of retrying continuously. Response timeout is 30 seconds. The checker is informational: it does not download files, restart the game, or send commands to the server.
 
-## Ручная установка готового мода
+This is an independent implementation of features described by [Workshop Update Checker](https://steamcommunity.com/sharedfiles/filedetails/?id=3628835042). Its code and assets are not included. The original description specifies checks triggered by a button and about 4 seconds between batches, but no fixed automatic interval. The 20-minute interval was chosen for WorkshopSentinel. WorkshopUpdateCheck is not required; enabling both may produce duplicate notifications.
 
-В Windows используйте **WorkshopSentinel-Setup.exe**: JAR, Lua, переводы и конфиг уже внутри, ничего скачивать или копировать отдельно не нужно. Шаги ниже — только для ручной установки и Linux. На сервере предполагается уже установленный ZombieBuddy Java agent; если он запросит одобрение JAR, подтвердите загрузку в ZombieBuddy.
+## Conflicts and load order
 
-### 1. Распакуйте архив
+`mod.info` defines `loadModAfter=\ZombieBuddy,\ModLoadOrderSorter_b42` and `incompatible=\ServerAutoUpdate_B42`.
 
-Распакуйте его в папку `mods` сервера. Должна получиться такая структура:
+[Server AutoUpdate](https://steamcommunity.com/sharedfiles/filedetails/?id=3756814990) and [Server AutoUpdate - Update Restart](https://steamcommunity.com/sharedfiles/filedetails/?id=3781306534) both use the mod ID `ServerAutoUpdate_B42`, so one conflict entry covers both. Avoid running independent restart controllers together. Disable ServerAutoUpdate_B42 in the client and server mod lists before installing WorkshopSentinel. The installer rejects this conflict rather than silently removing it.
+
+## Server restart logic
+
+1. Check items from the server's `WorkshopItems` every **5 minutes**.
+2. If an update is detected and the server is empty, write a restart request.
+3. If players are online, check the player count every **minute**.
+4. After **30 minutes** of waiting, warn players in chat and allow another **5 minutes** to leave safely.
+
+If the server empties earlier, a restart request is made at the next player check. Steam errors do not reset the waiting period; a player-count error postpones shutdown.
+
+## Manual server installation
+
+On Windows, use **WorkshopSentinel-Setup.exe** to install the embedded JAR, Lua files, translations, and configuration automatically. The steps below are for manual installation and Linux. The server must already have the ZombieBuddy Java agent installed; approve the JAR through ZombieBuddy if prompted.
+
+### 1. Extract the archive
+
+Extract it into the server's `mods` folder:
 
 ```text
 <PZ cachedir>/mods/WorkshopSentinel/
@@ -83,31 +97,31 @@
 └── common/
 ```
 
-`<PZ cachedir>` — папка данных сервера; обычно это `Zomboid` в домашней папке пользователя. При запуске с `-cachedir` используйте указанный там путь.
+`<PZ cachedir>` is the server data folder, usually `Zomboid` in the user's home directory. Use the specified path if the server starts with `-cachedir`.
 
-### 2. Подключите мод
+### 2. Enable the mod
 
-В `<PZ cachedir>/Server/<имя сервера>.ini` добавьте `WorkshopSentinel` к списку `Mods`. ZombieBuddy тоже должен быть подключён.
+Add `WorkshopSentinel` to `Mods` in `<PZ cachedir>/Server/<server name>.ini`. ZombieBuddy must also be enabled.
 
-Пример для сервера, использующего синтаксис с обратной косой чертой:
+For a server using backslash-prefixed mod IDs:
 
 ```ini
 Mods=\ZombieBuddy;\WorkshopSentinel
 ```
 
-Сохраните остальные моды и синтаксис вашего сервера. `WorkshopItems` должен содержать числовые ID отслеживаемых работ. У локального WorkshopSentinel собственного Workshop ID нет.
+Preserve the server's other mods and ID syntax. `WorkshopItems` should contain numeric IDs for the items to monitor. Local WorkshopSentinel has no Workshop ID of its own.
 
-ZombieBuddy должен загружаться как Java agent при запуске dedicated server. Если он запрашивает одобрение JAR, разрешите загрузку своей сборки WorkshopSentinel.
+ZombieBuddy must load as a Java agent when the dedicated server starts. Approve your WorkshopSentinel JAR if prompted.
 
-### 3. Скопируйте конфиг
+### 3. Copy the configuration
 
-Возьмите `config/WorkshopSentinel.properties` из архива и поместите его сюда:
+Copy `config/WorkshopSentinel.properties` from the archive to:
 
 ```text
-<PZ cachedir>/WorkshopSentinel/<имя сервера>/WorkshopSentinel.properties
+<PZ cachedir>/WorkshopSentinel/<server name>/WorkshopSentinel.properties
 ```
 
-Для первого запуска оставьте:
+For the first run, keep:
 
 ```properties
 dryRun=true
@@ -115,17 +129,17 @@ shutdownEnabled=false
 provider=steam
 ```
 
-Мод автоматически определяет имя запущенного сервера через `GameServer.serverName`. Для нестандартной установки можно принудительно переопределить его параметром **Java**:
+The mod reads the running server name from `GameServer.serverName`. For unusual setups, you can override it with a **Java** argument:
 
 ```text
 -Dworkshopsentinel.serverName=YOUR_SERVER_NAME
 ```
 
-При нестандартной папке данных добавьте `-Dworkshopsentinel.cachedir=PATH`. Параметры `-D...` ставятся до главного класса сервера.
+For a custom data directory, use `-Dworkshopsentinel.cachedir=PATH`. Place `-D...` arguments before the server main class.
 
-### 4. Запустите и проверьте лог
+### 4. Start the server and check the log
 
-Ожидаемые сообщения:
+Expected messages include:
 
 ```text
 Java bridge registered
@@ -133,29 +147,29 @@ Started dryRun=true
 Workshop check completed
 ```
 
-Логи сохраняются рядом с конфигом: `WorkshopSentinel-0.log` и его ротации. При обнаружении обновления появится `restart-marker.properties` — запись запроса перезапуска.
+Logs are stored beside the configuration: `WorkshopSentinel-0.log` and its rotations. When an update requires a restart, `restart-marker.properties` records the request.
 
-## Основные настройки
+## Main settings
 
-Все интервалы в таблице указаны в **секундах**.
+All intervals below are in **seconds**.
 
-| Настройка | По умолчанию | Назначение |
+| Setting | Default | Purpose |
 |---|---:|---|
-| `checkIntervalSeconds` | `300` | Проверять Workshop каждые 5 минут |
-| `playerPollSeconds` | `60` | Проверять игроков каждую минуту |
-| `maxWaitSeconds` | `1800` | Ждать 30 минут до предупреждения |
-| `countdownSeconds` | `300` | Дать 5 минут после предупреждения |
-| `dryRun` | `true` | Проверять логику без остановки сервера |
-| `shutdownEnabled` | `false` | Разрешение вызвать адаптер остановки |
-| `clientOptional` | `true` | Исключать WorkshopSentinel из требований к игрокам |
-| `shutdownAdapter` | `marker` | Только запись запроса перезапуска |
-| `provider` | `steam` | Steam; для проверки — `file`, заглушка — `noop` |
+| `checkIntervalSeconds` | `300` | Check Workshop every 5 minutes |
+| `playerPollSeconds` | `60` | Check players every minute |
+| `maxWaitSeconds` | `1800` | Wait 30 minutes before warning |
+| `countdownSeconds` | `300` | Allow 5 minutes after the warning |
+| `dryRun` | `true` | Exercise the logic without stopping the server |
+| `shutdownEnabled` | `false` | Allow the shutdown adapter to run |
+| `clientOptional` | `true` | Remove WorkshopSentinel from client requirements |
+| `shutdownAdapter` | `marker` | Only record a restart request |
+| `provider` | `steam` | Steam; use `file` for simulation or `noop` for no updates |
 
-После изменения конфига перезапустите процесс сервера. Относительные пути считаются от папки конфига. В путях Windows внутри `.properties` используйте `/` или двойную обратную косую черту.
+Restart the server process after changing configuration. Relative paths are resolved from the configuration folder. In Windows `.properties` paths, use `/` or doubled backslashes.
 
-## Быстрая проверка без остановки
+## Quick test without stopping the server
 
-На отдельном тестовом сервере замените настройки на:
+On a separate test server, use:
 
 ```properties
 dryRun=true
@@ -168,46 +182,54 @@ maxWaitSeconds=10
 countdownSeconds=5
 ```
 
-Запустите сервер без файла `simulate-update.txt`. Затем создайте этот файл рядом с конфигом и запишите в него `3619862853`.
+Start without `simulate-update.txt`. Then create that file beside the configuration and put `3619862853` in it.
 
-- **Без игроков:** появится marker с `reason=empty-server`.
-- **С игроком:** через примерно 10 секунд после обнаружения придёт предупреждение, затем через 5 секунд появится marker с `reason=forced-countdown-complete`.
-- **Игрок вышел раньше:** причина будет `empty-server` при следующем опросе.
+- **No players:** a marker appears with `reason=empty-server`.
+- **Player online:** a warning appears about 10 seconds after detection, followed 5 seconds later by a marker with `reason=forced-countdown-complete`.
+- **Player leaves earlier:** the next player check records `reason=empty-server`.
 
-В каждом случае сервер продолжает работать. Для нового сценария удалите файл имитации и запустите новую JVM: после запроса мод завершает текущий цикл наблюдения.
+The server keeps running in every case. To test another scenario, remove the simulation file and start a new JVM: the mod ends the current monitoring cycle after a restart request.
 
-После проверки верните `provider=steam` и интервалы `300`, `60`, `1800`, `300`.
+After testing, restore `provider=steam` and intervals `300`, `60`, `1800`, `300`.
 
-## Что важно перед реальным использованием
+## Before production use
 
-**Проверка Steam:** первый успешный ответ служит точкой отсчёта. По умолчанию мод обнаруживает последующие изменения, а не сравнивает Steam с установленными файлами. Обновление до первой проверки может быть пропущено; изменение описания Workshop тоже может изменить отслеживаемую дату.
+**Steam detection:** the first successful response establishes a baseline. By default, the server monitor detects subsequent changes rather than comparing Steam with installed files. An update before the first check may be missed; Workshop description changes may also change the monitored timestamp.
 
-**Перезапуск:** стандартный адаптер `marker` только записывает запрос. Для настоящего завершения есть явно включаемый `pz-quit-experimental`, но его API ещё нужно проверить на вашей версии B42. Повторный запуск процесса должен выполнять внешний управляющий сервис.
+**Restarting:** the default `marker` adapter only records a request. Actual shutdown requires explicitly enabling `pz-quit-experimental`; its API still needs verification on your B42 version. An external supervisor must restart the process.
 
-**Совместимость:** сборка и автоматические тесты проверяются отдельно от игры. Загрузка через ZombieBuddy, чат и остановка в настоящем PZ пока не подтверждены игровым тестом.
+**Compatibility:** builds and automated tests are checked separately from the game. Loading through ZombieBuddy, chat messages, and shutdown in a real PZ server have not yet been confirmed by a game smoke test.
 
-Подробности, дополнительные настройки и инструкции по экспериментальной остановке: [техническая справка](docs/TECHNICAL.md). Результаты сборки: [VERIFICATION.md](VERIFICATION.md).
+See the [technical reference](docs/TECHNICAL.md) for additional settings and experimental shutdown instructions, and [VERIFICATION.md](VERIFICATION.md) for verification results. These supporting documents are currently in Russian.
 
-## Сборка из исходников
+## Building from source
 
-Нужен **JDK 11–21** с настроенным `JAVA_HOME`. Это требование сборки; сервер запускайте на Java, поставляемой с вашей версией PZ.
+Use **JDK 11–21** with `JAVA_HOME` configured. This is the build requirement; run the server with the Java runtime supplied with your PZ version.
 
-В папке проекта выполните:
+From the project folder:
 
 ```powershell
 .\gradlew.bat clean build modZip
 ```
 
-В Linux: `sh gradlew clean build modZip`. Первый запуск скачает Gradle 8.7; дополнительных Java-библиотек проект не требует.
+On Linux, run `sh gradlew clean build modZip`. The first run downloads Gradle 8.7. No additional Java libraries are required.
 
-Готовые файлы:
+Build outputs:
 
-- **Единый Windows-установщик:** после сборки архивов выполните `powershell -NoProfile -File installer/build.ps1`; результат — `build/installer/WorkshopSentinel-Setup.exe`. Для сборки установщика нужен встроенный в Windows компилятор .NET Framework 4.x.
-- **Архив установки:** `build/distributions/WorkshopSentinel-mod.zip`.
+- **Windows installer:** after building the archive, run `powershell -NoProfile -File installer/build.ps1`. Output: `build/installer/WorkshopSentinel-Setup.exe`. This uses the .NET Framework 4.x compiler bundled with Windows.
+- **Mod archive:** `build/distributions/WorkshopSentinel-mod.zip`.
 - **JAR:** `42/media/java/WorkshopSentinel.jar`.
 
-Сборка запускает поведенческие тесты автоматически. Отдельно: `gradlew.bat selfTest`. Проверить доступ к публичному Steam API: `gradlew.bat steamProbe -PprobeIds=3619862853`.
+Both English and Russian READMEs are included in the mod archive and installer.
 
-Клиентские Lua-тесты в Windows: `powershell -NoProfile -File installer/test-client.ps1 -GameDirectory "ПУТЬ_К_ProjectZomboid"`. Нужен JAVA_HOME с JDK 11+. Они используют Kahlua/stdlib установленной игры и подставные объекты Steam/UI; саму игру не запускают.
+The build runs behavioral tests automatically. Run them separately with `gradlew.bat selfTest`. To probe the public Steam API, use `gradlew.bat steamProbe -PprobeIds=3619862853`.
 
-Для проверки в игре включите WorkshopSentinel, откройте «Обновления модов», выключите фильтр «Показывать только изменившиеся моды» и проверьте список, версию, ChangeLog и обе кнопки ссылок. В Mod Options доступен тест окна с явно имитированными данными. После первого успешного сканирования кеш появится в Lua-папке данных; при следующем запуске новые даты/версии должны отмечаться как изменения. Обычная установка не создаёт искусственных событий обновления.
+For client Lua tests on Windows:
+
+```powershell
+powershell -NoProfile -File installer/test-client.ps1 -GameDirectory "PATH_TO_ProjectZomboid"
+```
+
+Set `JAVA_HOME` to JDK 11 or newer. These tests use the installed game's Kahlua runtime and standard library with Steam/UI test doubles; they do not start the game.
+
+For an in-game check, enable WorkshopSentinel, open **Mod updates**, disable **Show changed mods only**, and inspect the list, version, changelog, and both link actions. After the first successful scan, the cache should appear in the data folder's `Lua` directory. On the next run, new timestamps or versions should be marked as changes. Normal installation does not create simulated update events.
