@@ -10,8 +10,8 @@ using System.Text.RegularExpressions;
 using System.Security.Cryptography;
 
 [assembly: AssemblyTitle("WorkshopSentinel Setup")]
-[assembly: AssemblyVersion("0.4.10.0")]
-[assembly: AssemblyFileVersion("0.4.10.0")]
+[assembly: AssemblyVersion("0.4.10.1")]
+[assembly: AssemblyFileVersion("0.4.10.1")]
 
 class Setup {
     static string DefaultDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Zomboid");
@@ -315,7 +315,12 @@ class Setup {
         void LoadServers() {
             string previous=name.Text; name.Items.Clear();
             try { string dir=Path.Combine(dataDir.Text,"Server"); if(Directory.Exists(dir)) foreach(string file in Directory.GetFiles(dir,"*.ini")) name.Items.Add(Path.GetFileNameWithoutExtension(file)); } catch { }
-            if(name.Items.Contains(previous)) name.SelectedItem=previous; else if(name.Items.Count>0) name.SelectedIndex=0;
+            int preferred=-1;
+            for(int i=0;i<name.Items.Count;i++)
+                if(String.Equals((string)name.Items[i],"servertest",StringComparison.OrdinalIgnoreCase)) { preferred=i; break; }
+            if(preferred>=0) name.SelectedIndex=preferred;
+            else if(name.Items.Contains(previous)) name.SelectedItem=previous;
+            else if(name.Items.Count>0) name.SelectedIndex=0;
             server.Enabled=name.Items.Count>0; server.Checked=server.Enabled; name.Enabled=server.Checked;
         }
         void AddLabel(string text,int x,int y,int width,int height=25) { var label=new Label();label.Text=text;label.SetBounds(x,y,width,height);Controls.Add(label); }
