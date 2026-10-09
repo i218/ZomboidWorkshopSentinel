@@ -1,0 +1,5 @@
+# Copy to signing.local.properties (ignored by Git).
+# The actual private key must stay outside the repository and distributions.
+zbsSigningEnabled=false
+zbsSteamID64=YOUR_17_DIGIT_STEAM_ID
+zbsPrivateKeyFile=C:/private/path/ed25519-private.der

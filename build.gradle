@@ -1,0 +1,73 @@
+plugins { id 'java' }
+
+group = 'io.workshopsentinel'
+version = '0.4.7'
+def localSigning = new Properties()
+def signingFile = file('signing.local.properties')
+if (signingFile.exists()) signingFile.withInputStream { localSigning.load(it) }
+def signingKey = providers.gradleProperty('zbsPrivateKeyFile').getOrElse(localSigning.getProperty('zbsPrivateKeyFile', ''))
+def signingAuthor = providers.gradleProperty('zbsSteamID64').getOrElse(localSigning.getProperty('zbsSteamID64', ''))
+def signingEnabled = providers.gradleProperty('zbsSigningEnabled').getOrElse(localSigning.getProperty('zbsSigningEnabled', 'false')).toBoolean()
+tasks.register('signJarZBS', Exec) {
+    dependsOn jar
+    doFirst {
+        if (!signingEnabled) throw new GradleException('Signing is deferred. Enable explicitly with zbsSigningEnabled=true')
+        if (!signingKey || !signingAuthor) throw new GradleException('Configure zbsSteamID64 and zbsPrivateKeyFile in signing.local.properties or -P')
+        commandLine 'powershell.exe', '-NoProfile', '-File', file('installer/sign-jar.ps1'),
+            '-Jar', tasks.named('jar').get().archiveFile.get().asFile, '-SteamId', signingAuthor, '-PrivateKeyFile', signingKey
+    }
+}
+// Java 11 bytecode also runs on the Java 17/25 runtimes used by B42.
+java { sourceCompatibility = JavaVersion.VERSION_11; targetCompatibility = JavaVersion.VERSION_11 }
+tasks.withType(JavaCompile).configureEach {
+    options.release = 11
+    options.encoding = 'UTF-8'
+}
+tasks.named('jar') {
+    archiveFileName = 'WorkshopSentinel.jar'
+    preserveFileTimestamps = false
+    reproducibleFileOrder = true
+    manifest { attributes 'Implementation-Title': 'WorkshopSentinel', 'Implementation-Version': project.version }
+}
+// No game jars, downloaded libraries, or test framework required.
+tasks.register('selfTest', JavaExec) {
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'io.workshopsentinel.SentinelTests'
+}
+tasks.named('check') { dependsOn selfTest }
+tasks.register('steamProbe', JavaExec) {
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'io.workshopsentinel.SteamProbe'
+    args providers.gradleProperty('probeIds').getOrElse('')
+}
+tasks.register('stageMod', Copy) {
+    outputs.upToDateWhen { false } // Also removes stale sidecars when switching to an unsigned build.
+    dependsOn jar
+    if (signingEnabled) {
+        dependsOn 'signJarZBS'
+        from(layout.buildDirectory.file('libs/WorkshopSentinel.jar.zbs'))
+    }
+    from(tasks.named('jar'))
+    into layout.projectDirectory.dir('42/media/java')
+    doLast {
+        // Remove only the obsolete generated JAR; one bootstrap JAR is now used.
+        delete layout.projectDirectory.file('42/media/java/server/WorkshopSentinel.jar')
+        if (!signingEnabled) delete layout.projectDirectory.file('42/media/java/WorkshopSentinel.jar.zbs')
+    }
+}
+tasks.register('modZip', Zip) {
+    dependsOn stageMod
+    archiveFileName = 'WorkshopSentinel-mod.zip'
+    destinationDirectory = layout.buildDirectory.dir('distributions')
+    into('WorkshopSentinel') {
+        into('42') { from('42') }
+        into('common') { from('common') }
+        into('config') { from('config') }
+        into('docs') { from('docs') }
+        from('README.md', 'VERIFICATION.md')
+    }
+    exclude '**/.gitkeep'
+}
+tasks.named('build') { dependsOn stageMod }
