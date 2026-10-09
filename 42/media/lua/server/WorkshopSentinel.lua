@@ -1,6 +1,6 @@
 -- Loaded only by the dedicated server. Java API is registered by Main.main.
 if not isServer() then return end
-print('[WorkshopSentinel server] Lua bootstrap v0.4.8 loaded; waiting for ZombieBuddy Java bridge')
+print('[WorkshopSentinel server] Lua bootstrap v0.4.9 loaded; waiting for ZombieBuddy Java bridge')
 local reportedMissing = false
 local failed = false
 local function tick()

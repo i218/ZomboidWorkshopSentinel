@@ -8,7 +8,7 @@ A mod for **Project Zomboid Build 42 Dedicated Server** with ZombieBuddy install
 
 ## One mod for the client and server
 
-**WorkshopSentinel 0.4.8 uses one folder, one mod ID, and one package.** It contains a Java server monitor, a Lua client update checker, and support for the server settings editor with MLOS. The runtime environment determines which code runs.
+**WorkshopSentinel 0.4.9 uses one folder, one mod ID, and one package.** It contains a Java server monitor, a Lua client update checker, and support for the server settings editor with MLOS. The runtime environment determines which code runs.
 
 ### Windows installation
 
@@ -245,3 +245,7 @@ To verify exposure against your installed game and ZombieBuddy without starting 
 ```
 
 The test requires a JDK via `JAVA_HOME` and uses the game's Java runtime.
+
+### Server configuration fix (0.4.9)
+
+An empty `serverIni=` now correctly uses `Server/<running server name>.ini`. Earlier versions resolved it to the configuration folder and failed with AccessDeniedException. Reinstall and restart normally; existing configuration needs no manual edits. Explicit paths remain supported, with relative paths resolved beside the mod configuration.

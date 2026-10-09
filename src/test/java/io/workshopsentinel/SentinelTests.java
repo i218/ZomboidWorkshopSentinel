@@ -21,6 +21,7 @@ public final class SentinelTests {
             run("safe defaults and config validation", SentinelTests::config);
             run("automatic running server name and explicit override", SentinelTests::serverName);
             run("configured server WorkshopItems and explicit IDs", SentinelTests::items);
+            run("distributed config blank serverIni reads the running server profile", SentinelTests::blankServerIni);
             run("empty server requests once immediately", SentinelTests::empty);
             run("30 minute wait plus full 5 minute countdown", SentinelTests::countdown);
             run("later updates do not reset detection time", SentinelTests::sticky);
@@ -143,6 +144,26 @@ public final class SentinelTests {
         eq(c.configuredWorkshopIds(), Set.of("3619862853", "123"));
         eq(cfg("workshopIds", "123;456").configuredWorkshopIds(), Set.of("123", "456"));
         fails(() -> cfg().configuredWorkshopIds());
+    }
+    private static void blankServerIni() throws Exception {
+        Path cache = Files.createTempDirectory(temp, "blank-server-ini-");
+        Path ini = cache.resolve("Server/servertest1.ini");
+        Files.createDirectories(ini.getParent());
+        Files.writeString(ini, "WorkshopItems=123;456\n");
+        Path configFile = cache.resolve("WorkshopSentinel/servertest1/WorkshopSentinel.properties");
+        Files.createDirectories(configFile.getParent());
+        Files.copy(Paths.get("config/WorkshopSentinel.properties"), configFile);
+        Config shipped = Config.load(configFile, ini);
+        eq(shipped.serverIni, ini.toAbsolutePath().normalize());
+        eq(shipped.configuredWorkshopIds(), Set.of("123", "456"));
+        for (String value : new String[]{"", "   "}) {
+            Properties p = new Properties(); p.setProperty("serverIni", value);
+            eq(new Config(p, configFile, ini).serverIni, ini.toAbsolutePath().normalize());
+        }
+        Properties relative = new Properties(); relative.setProperty("serverIni", "custom.ini");
+        eq(new Config(relative, configFile, ini).serverIni, configFile.getParent().resolve("custom.ini"));
+        relative.setProperty("serverIni", ini.toString());
+        eq(new Config(relative, configFile, ini).serverIni, ini);
     }
     private static void empty() throws Exception {
         Scenario s = new Scenario(); s.game.players = 0; s.start(); s.engine.tick(10000);

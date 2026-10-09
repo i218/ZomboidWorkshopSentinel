@@ -41,7 +41,8 @@ public final class Config {
         return new Config(p, file, defaultIni);
     }
     private Path path(Properties p, String key, String fallback) {
-        Path value = Paths.get(p.getProperty(key, fallback).trim());
+        String configured = p.getProperty(key, "").trim();
+        Path value = Paths.get(configured.isEmpty() ? fallback : configured);
         return (value.isAbsolute() ? value : directory.resolve(value)).normalize();
     }
     private static boolean bool(Properties p, String key, boolean fallback) {
