@@ -32,6 +32,7 @@ function Widget:addItem(name,row) table.insert(self.items,{text=name,item=row,in
 function Widget:setAnchorLeft(value) end
 function Widget:setAnchorRight(value) end
 function Widget:setVisible(value) self.visible=value end
+function Widget:setEnable(value) self.enabled=value end
 ISPanel=Widget:derive("ISPanel"); ISButton=Widget:derive("ISButton")
 ISScrollingListBox=Widget:derive("ISScrollingListBox"); ISRichTextPanel=Widget:derive("ISRichTextPanel")
 PZAPI={ModOptions={}}

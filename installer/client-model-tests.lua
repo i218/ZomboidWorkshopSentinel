@@ -8,12 +8,12 @@ testWriterUnavailable=false
 
 
 testActive = {"A", "B", "Local"}; testMods = { A = info("A", "10", "1"), B = info("B", "10", "1"), Local = info("Local", "", "1") }
-assert(#C.collect() == 1, "Deduplicate Workshop IDs and skip local mods")
+assert(#C.collect() == 1 and #C.localRows == 1, "Separate Workshop groups and local mods")
 assert(C.start()); C.tick()
 local request = testRequests[#testRequests]
 request.callback(request.context, "Completed", list({detail("10", 100)}))
 testTime = testTime + 4000; C.tick()
-assert(C.status == "complete" and C.changedCount == 0 and C.rows[1].first, "First scan is baseline only")
+assert(C.status == "complete" and C.changedCount == 0 and C.rows[1].first and #C.rows == 2, "First scan is baseline only")
 assert(testFiles[C.cacheFile]:match("10\t100"), "Persist cache")
 C.loadCache(); testTime = testTime + 60000
 assert(C.start()); C.tick(); request = testRequests[#testRequests]
@@ -37,7 +37,7 @@ assert(C.status == "timeout" and not C.busy, "Timeout")
 request.callback(request.context, "Completed", list({detail("10", 999)}))
 assert(C.status == "timeout" and testFiles[C.cacheFile] == goodCache, "Ignore late callback")
 testTime = testTime + 60000; testSteam = false
-assert(not C.start() and C.status == "no-steam"); testSteam = true
+assert(C.start() and C.status == "local-only" and #C.rows == 1); testSteam = true
 testFiles["A/ChangeLog.txt"] = "Version 2\nA change"
 assert(C.changelog({mods={"A"}}):match("A change"), "Read local ChangeLog")
 testActive, testMods = {}, {}
@@ -104,3 +104,23 @@ testTime=C.nextAutoAt; C.tick()
 assert(#testRequests==count+1,"Automatic retry at next interval")
 C.fail("timeout")
 C.automatic=false; MainScreen=nil
+
+-- Local mods are tracked automatically without any Steam query, including offline.
+testActive={"Local","\\Local","Broken","Missing"}
+testMods={Local=info("Local","","1"),Broken={getWorkshopID=function()error("AccessDeniedException: metadata")end}}
+testSteam=false; testTime=testTime+60000
+local requests=#testRequests
+assert(C.start() and #C.rows==1 and C.status=="local-only","Local scan isolates missing/unreadable mods and deduplicates IDs")
+assert(#testRequests==requests and not C.rows[1].available,"Never query Steam for a local mod")
+C.loadCache(); assert(C.baseline["local:Local"].version=="Local=1","Local baseline survives cache roundtrip")
+testMods.Local=info("Local","","2"); testTime=testTime+60000
+assert(C.start() and C.rows[1].changed and C.changedCount==1,"Local mod version change is detected offline")
+assert(C.baseline["10"],"Offline local scan preserves existing Steam baseline")
+local oldBaseline=C.baseline
+local originalReader=getFileReader
+getFileReader=function()error("AccessDeniedException: cache")end
+C.loadCache(); assert(C.baseline==oldBaseline,"Failed cache read retains memory baseline")
+getFileReader=originalReader
+testWriterUnavailable=true; testTime=testTime+60000
+assert(C.start() and C.status=="cache-error" and #C.rows==1,"Denied cache writer retains local results")
+testWriterUnavailable=false; testSteam=true

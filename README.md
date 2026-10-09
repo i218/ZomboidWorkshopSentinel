@@ -8,7 +8,7 @@ A mod for **Project Zomboid Build 42 Dedicated Server** with ZombieBuddy install
 
 ## One mod for the client and server
 
-**WorkshopSentinel 0.4.9 uses one folder, one mod ID, and one package.** It contains a Java server monitor, a Lua client update checker, and support for the server settings editor with MLOS. The runtime environment determines which code runs.
+**WorkshopSentinel 0.4.10 uses one folder, one mod ID, and one package.** It contains a Java server monitor, a Lua client update checker, and support for the server settings editor with MLOS. The runtime environment determines which code runs.
 
 ### Windows installation
 
@@ -37,14 +37,14 @@ An older `.jar.zbs`, if installed, is moved to a backup folder outside `mods`. T
 
 ### What runs in each environment
 
-- **Client:** the Workshop checker and settings editor support in `media/lua/client`. MLOS support keeps an existing local WorkshopSentinel mod in the saved configuration without inventing a Workshop ID. These features do not need a client Java agent.
+- **Client:** the Workshop checker and settings editor support in `media/lua/client`. MLOS support keeps all installed local mods in the saved configuration without inventing a Workshop ID. These features do not need a client Java agent.
 - **Dedicated server:** the Java bootstrap at `media/java/WorkshopSentinel.jar`, loaded through ZombieBuddy, and the server Lua bridge. The monitor checks `GameServer.server` on the first server tick before starting. Client Lua does not run there.
 
 Since 0.4.1, the JAR uses a neutral path instead of `media/java/server`. In the supplied Build 42.21.0 server log, ZombieBuddy 2.3.4 incorrectly skipped the server-only JAR during dedicated server startup. With ZombieBuddy on the client, the minimal Java bootstrap may now load and request approval there too, but it does not start monitoring, a scheduler, or shutdown. The client UI works without a Java agent.
 
 The installer disables discovery of legacy `.WorkshopSentinel-install-*` copies with the WorkshopSentinel ID by moving only their `42/mod.info` into a backup folder. It preserves the remaining files and does not alter other mods.
 
-For MLOS support, enable WorkshopSentinel in the main Mods menu; the client installer does this automatically. The log should show `MLOS compatibility enabled: local mod retained without Workshop ID`. MLOS files are not modified.
+For MLOS support, enable WorkshopSentinel in the main Mods menu; the client installer does this automatically. The log should show `MLOS compatibility enabled: installed local mods retained without Workshop IDs`. MLOS files are not modified.
 
 `clientOptional=true` removes only WorkshopSentinel from the server's advertised client requirements after the first tick. Connecting without the unified mod and Lua checksum behavior **still need verification in a real game session**. A local mod has no Workshop ID; adding a published item to `WorkshopItems` may require downloading it independently of the `Mods` list.
 
@@ -56,7 +56,7 @@ Checks run automatically on entering the main menu and then every **20 minutes**
 
 New checks and popups are deferred during gameplay until you return to the menu. The **Mod updates** menu button opens existing results without querying Steam. **Mod Options → WorkshopSentinel** lets you disable automatic popups or change the filter; no configuration is needed for normal operation.
 
-Only active Workshop mods are checked; local mods are skipped. The window shows versions from `mod.info`, Steam state, the Steam update date, and a local `ChangeLog.txt`. It can open the item in the Steam Overlay or copy its link. English and Russian UI text are supported. The game reader loads changelogs from the mod's version folder or `common`, and the UI displays them as plain text.
+Active Workshop mods are checked through Steam; active local mods are compared by version metadata. The window shows versions from `mod.info`, Steam state, the Steam update date, and a local `ChangeLog.txt`. For Workshop rows, it can open the item in the Steam Overlay or copy its link. English and Russian UI text are supported. The game reader loads changelogs from the mod's version folder or `common`, and the UI displays them as plain text.
 
 The first successful check establishes a baseline. Later checks compare Steam timestamps and `mod.info` versions; Steam's `NeedsUpdate` state is shown separately. A changed timestamp can reflect Workshop metadata, so the list does not prove that code changed or that a new build has been downloaded.
 
@@ -249,3 +249,11 @@ The test requires a JDK via `JAVA_HOME` and uses the game's Java runtime.
 ### Server configuration fix (0.4.9)
 
 An empty `serverIni=` now correctly uses `Server/<running server name>.ini`. Earlier versions resolved it to the configuration folder and failed with AccessDeniedException. Reinstall and restart normally; existing configuration needs no manual edits. Explicit paths remain supported, with relative paths resolved beside the mod configuration.
+
+### Local mods and file errors (0.4.10)
+
+All installed local mods are preserved by the MLOS server editor in selection order. Missing mods still go through MLOS validation. No Workshop IDs are invented, and other mods do not become optional for clients.
+
+The client automatically compares local `modversion` metadata, including when Steam is disabled. Local rows have no Workshop actions and never enter Steam requests. This detects version metadata changes, not arbitrary file changes or unpublished remote updates. Server monitoring continues to use real `WorkshopItems`; local-only changes do not trigger a server restart.
+
+File failures report the operation, path and corrective action. Repeated identical failures are summarized at most once per ten minutes, with recovery logged on success. Workshop checks retry on their normal interval; failed restart-marker writes postpone shutdown and retry at the player poll. Unreadable configuration or a required installed baseline disables initialization until corrected and restarted. Failure to open the log file keeps console logging and monitoring active. Client cache failures retain results and the memory baseline. The installer reports permissions, path-type and file-lock hints and retains its rollback behavior. No permissions or ZombieBuddy trust settings are changed. Errors emitted by other mods remain under those mods' control.

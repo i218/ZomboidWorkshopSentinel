@@ -18,7 +18,7 @@ public final class Main {
             // Default exposure retains the canonical global WorkshopSentinelBridge.
             exposer.getMethod("exposeClass", Class.class).invoke(null, WorkshopSentinelBridge.class);
             registered = true;
-            LOG.info("Java bridge registered v0.4.9; awaiting server OnTick. Dedicated-server guard is deferred until tick.");
+            LOG.info("Java bridge registered v0.4.10; awaiting server OnTick. Dedicated-server guard is deferred until tick.");
         } catch (Exception e) {
             LOG.log(Level.SEVERE, "ZombieBuddy Exposer API unavailable; mod disabled. TODO verify deployed ZombieBuddy version", e);
         }
@@ -45,8 +45,12 @@ public final class Main {
                 Path file = Paths.get(System.getProperty("workshopsentinel.config", defaultConfig.toString()));
                 Config c = Config.load(file, cache.resolve("Server").resolve(name + ".ini"));
                 Files.createDirectories(c.directory);
-                FileHandler handler = new FileHandler(c.directory.resolve("WorkshopSentinel-%g.log").toString(), 1024 * 1024, 3, true);
-                handler.setEncoding("UTF-8"); handler.setFormatter(new SimpleFormatter()); LOG.addHandler(handler);
+                try {
+                    FileHandler handler = new FileHandler(c.directory.resolve("WorkshopSentinel-%g.log").toString(), 1024 * 1024, 3, true);
+                    handler.setEncoding("UTF-8"); handler.setFormatter(new SimpleFormatter()); LOG.addHandler(handler);
+                } catch (java.io.IOException | SecurityException loggingFailure) {
+                    new FailureReporter(LOG).failed("File logging", "Console logging remains active; monitoring continues", loggingFailure);
+                }
                 PzGameAdapter game = new PzGameAdapter();
                 if (c.clientOptional) OptionalClientModAdapter.apply(LOG);
                 ShutdownAdapter shutdown = () -> LOG.info("Marker-only adapter; supervisor/operator handles restart");
@@ -59,7 +63,7 @@ public final class Main {
                 Runtime.getRuntime().addShutdownHook(new Thread(service::close, "WorkshopSentinel-Cleanup"));
                 LOG.info("Started dryRun=" + c.dryRun + " shutdownEnabled=" + c.shutdownEnabled + " provider=" + c.provider
                     + " clientOptional=" + c.clientOptional + " serverIni=" + c.serverIni + " config=" + file.toAbsolutePath());
-            } catch (Exception e) { LOG.log(Level.SEVERE, "Initialization failed; monitoring disabled until JVM restart", e); }
+            } catch (Exception e) { new FailureReporter(LOG).failed("Initialization", "Monitoring disabled; correct configuration/access and restart JVM", e); }
         }
         if (service != null) service.onTick();
     }

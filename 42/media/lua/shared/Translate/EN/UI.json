@@ -13,7 +13,7 @@
   "UI_WorkshopSentinel_NolocalChangeLogtxt": "No local ChangeLog.txt.",
   "UI_WorkshopSentinel_CheckingWorkshop": "Checking Workshop…",
   "UI_WorkshopSentinel_CheckcompleteChangesarecomparedwiththeprevioussession": "Check complete. The next check will run automatically.",
-  "UI_WorkshopSentinel_NoactiveWorkshopmodsLocalmodsareskipped": "No active Workshop mods. Local mods are skipped.",
+  "UI_WorkshopSentinel_NoactiveWorkshopmodsLocalmodsareskipped": "No active mods to check",
   "UI_WorkshopSentinel_Steamisdisabled": "Steam is disabled.",
   "UI_WorkshopSentinel_Pleasewait60secondsbetweenchecks": "Please wait 60 seconds between checks.",
   "UI_WorkshopSentinel_SteamrequesttimedoutPreviousresultsareretained": "Steam request timed out. Previous results are retained.",
@@ -22,5 +22,7 @@
   "UI_WorkshopSentinel_ResultsarereadycachecouldnotbesavedSeethegamelog": "Results are ready; cache could not be saved. See the game log.",
   "UI_WorkshopSentinel_CacheclearedNextscancreatesanewbaseline": "Cache cleared. Next scan creates a new baseline.",
   "UI_WorkshopSentinel_AutomaticChecks": "Updates are checked automatically every 20 minutes.",
-  "UI_WorkshopSentinel_NoChanges": "No new changes. WorkshopSentinel will check for updates automatically."
+  "UI_WorkshopSentinel_NoChanges": "No new changes. WorkshopSentinel will check for updates automatically.",
+  "UI_WorkshopSentinel_LocalMod": "Local mod: version changes only; no Workshop item",
+  "UI_WorkshopSentinel_LocalOnly": "Local versions checked; no Steam results"
 }

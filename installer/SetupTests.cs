@@ -19,6 +19,8 @@ class SetupTests {
         string installed=File.ReadAllText(ini),enabled=File.ReadAllText(profile);
         Check(installed==original.Replace("Mods=\\Other;\\ZombieBuddy","Mods=\\Other;\\ZombieBuddy;\\WorkshopSentinel"),"Preserve other server settings, IDs and slash syntax");
         Check(enabled.Contains("mod = Other") && enabled.Contains("mod = WorkshopSentinel") && enabled.Contains("map = CustomMap"),"Preserve client mods and map order");
+        Check(Setup.FileErrorHint(new UnauthorizedAccessException("denied")).Contains("права"),"Access-denied diagnostic explains permissions");
+        Check(Setup.FileErrorHint(new IOException("locked")).Contains("заблокированы"),"I/O diagnostic explains file locks");
         string jar=Path.Combine(dir,"mods","WorkshopSentinel","42","media","java","WorkshopSentinel.jar");
         Check(File.Exists(jar) && new FileInfo(jar).Length>1000,"Installer contains and deploys real JAR");
         if(File.Exists(jar+".zbs")) Check(File.ReadAllText(jar+".zbs").Contains("SteamID64:76561199013754121"),"Signature installed next to JAR");

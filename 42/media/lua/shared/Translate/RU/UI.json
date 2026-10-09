@@ -13,7 +13,7 @@
   "UI_WorkshopSentinel_NolocalChangeLogtxt": "Локальный ChangeLog.txt отсутствует.",
   "UI_WorkshopSentinel_CheckingWorkshop": "Проверяю Workshop…",
   "UI_WorkshopSentinel_CheckcompleteChangesarecomparedwiththeprevioussession": "Проверка завершена. Следующая проверка — автоматически.",
-  "UI_WorkshopSentinel_NoactiveWorkshopmodsLocalmodsareskipped": "Нет активных Workshop-модов. Локальные моды пропускаются.",
+  "UI_WorkshopSentinel_NoactiveWorkshopmodsLocalmodsareskipped": "Нет активных модов для проверки",
   "UI_WorkshopSentinel_Steamisdisabled": "Steam отключён.",
   "UI_WorkshopSentinel_Pleasewait60secondsbetweenchecks": "Между проверками нужно подождать 60 секунд.",
   "UI_WorkshopSentinel_SteamrequesttimedoutPreviousresultsareretained": "Steam не ответил вовремя. Предыдущий результат сохранён.",
@@ -22,5 +22,7 @@
   "UI_WorkshopSentinel_ResultsarereadycachecouldnotbesavedSeethegamelog": "Результаты готовы; кеш не сохранён. Подробности в логе игры.",
   "UI_WorkshopSentinel_CacheclearedNextscancreatesanewbaseline": "Кеш очищен. Следующая проверка создаст новую точку отсчёта.",
   "UI_WorkshopSentinel_AutomaticChecks": "Проверка обновлений выполняется автоматически каждые 20 минут.",
-  "UI_WorkshopSentinel_NoChanges": "Новых изменений нет. WorkshopSentinel проверит обновления автоматически."
+  "UI_WorkshopSentinel_NoChanges": "Новых изменений нет. WorkshopSentinel проверит обновления автоматически.",
+  "UI_WorkshopSentinel_LocalMod": "Локальный мод: только изменения версии; предмета Workshop нет",
+  "UI_WorkshopSentinel_LocalOnly": "Локальные версии проверены; результатов Steam нет"
 }

@@ -13,6 +13,19 @@ function C.enableAutomaticChecks()
 end
 local function clean(value) return (tostring(value or ""):gsub("[\t\r\n]", " ")) end
 local function now() return getTimestampMs() end
+C.failures = {}
+function C.reportFailure(operation, reason)
+    local message = tostring(reason):gsub("[\r\n].*", "")
+    local previous = C.failures[operation]
+    if not previous or previous.message ~= message or now() - previous.at >= 600000 then
+        print("[WorkshopSentinel client] " .. operation .. ": " .. message .. "; retry on next scan")
+        C.failures[operation] = { message = message, at = now() }
+    end
+end
+function C.reportRecovery(operation)
+    if C.failures[operation] then print("[WorkshopSentinel client] " .. operation .. " recovered") end
+    C.failures[operation] = nil
+end
 function C.notify()
     for _, listener in ipairs(C.listeners) do
         local ok, err = pcall(listener, C)
@@ -20,7 +33,7 @@ function C.notify()
     end
 end
 function C.loadCache()
-    C.baseline = {}
+    local loaded = {}
     local reader
     local ok, err = pcall(function()
         reader = getFileReader(C.cacheFile, false)
@@ -28,12 +41,12 @@ function C.loadCache()
         for i = 1, 20000 do
             local line = reader:readLine()
             if not line then break end
-            local id, stamp, version = line:match("^(%d+)\t(%d+)\t(.*)$")
-            if id then C.baseline[id] = { updated = tonumber(stamp), version = version } end
+            local id, stamp, version = line:match("^([^\t]+)\t(%d+)\t(.*)$")
+            if id and (id:match("^%d+$") or id:match("^local:")) then loaded[id] = { updated = tonumber(stamp), version = version } end
         end
     end)
     if reader then pcall(function() reader:close() end) end
-    if not ok then print("[WorkshopSentinel client] Cache read: " .. tostring(err)) end
+    if not ok then C.reportFailure("Cache read", err) else C.baseline = loaded; C.reportRecovery("Cache read") end
 end
 function C.saveCache(records)
     local writer
@@ -52,33 +65,44 @@ function C.saveCache(records)
         return true
     end)
     if writer then pcall(function() writer:close() end) end
-    if not ok then return false, result end
+    if not ok then C.reportFailure("Cache write", result); return false, result end
+    if result then C.reportRecovery("Cache write") else C.reportFailure("Cache write", reason) end
     return result, reason
 end
 function C.resetCache()
     if C.busy then return false end
     local ok, err = C.saveCache({})
     if ok then C.baseline, C.rows = {}, {}; C.status = "reset"
-    else C.status = "cache-error"; print("[WorkshopSentinel client] " .. tostring(err)) end
+    else C.status = "cache-error" end
     C.notify()
     return ok
 end
 function C.collect()
-    local active, groups = getActivatedMods(), {}
+    local active, groups, localRows, seen = getActivatedMods(), {}, {}, {}
     for i = 0, active:size() - 1 do
         local modId = tostring(active:get(i)):gsub("^\\", "")
-        local info = getModInfoByID(modId)
-        if info then
-            local id = info:getWorkshopID()
-            if not id or id == "" then id = tostring(info:getDir()):gsub("\\", "/"):match("/108600/(%d+)/") end
-            if id and tostring(id):match("^%d+$") then
-                id = tostring(id)
-                local group = groups[id] or { id = id, mods = {}, names = {}, versions = {} }
-                groups[id] = group
-                table.insert(group.mods, modId)
-                table.insert(group.names, clean(info:getName()))
-                table.insert(group.versions, clean(modId) .. "=" .. clean(info:getModVersion()))
-            end
+        if not seen[modId] then
+            seen[modId] = true
+            local ok, problem = pcall(function()
+                local info = getModInfoByID(modId)
+                if not info then C.reportFailure("Mod metadata " .. modId, "Active mod is missing"); return end
+                local name, version = clean(info:getName()), clean(info:getModVersion())
+                local id = info:getWorkshopID()
+                if not id or id == "" or tostring(id) == "0" then id = tostring(info:getDir()):gsub("\\", "/"):match("/108600/(%d+)/") end
+                if id and tostring(id):match("^[1-9]%d*$") then
+                    id = tostring(id)
+                    local group = groups[id] or { id = id, mods = {}, names = {}, versions = {} }
+                    groups[id] = group
+                    table.insert(group.mods, modId)
+                    table.insert(group.names, name)
+                    table.insert(group.versions, clean(modId) .. "=" .. version)
+                else
+                    table.insert(localRows, {id="local:" .. modId, localMod=true, mods={modId},
+                        title=name, version=clean(modId) .. "=" .. version, updated=0, state="Local"})
+                end
+                C.reportRecovery("Mod metadata " .. modId)
+            end)
+            if not ok then C.reportFailure("Mod metadata " .. modId, problem) end
         end
     end
     local rows = {}
@@ -89,6 +113,8 @@ function C.collect()
         table.insert(rows, group)
     end
     table.sort(rows, function(a, b) return a.id < b.id end)
+    table.sort(localRows, function(a, b) return a.id < b.id end)
+    C.localRows = localRows
     return rows
 end
 function C.fail(reason)
@@ -99,7 +125,9 @@ function C.fail(reason)
 end
 function C.complete()
     C.rows, C.busy, C.pending, C.nextAt = C.scanRows, false, nil, nil
+    for _, row in ipairs(C.localRows or {}) do table.insert(C.rows, row) end
     local records, changed = {}, 0
+    for id, record in pairs(C.baseline) do records[id] = record end
     for _, row in ipairs(C.rows) do
         local previous = C.baseline[row.id]
         row.available = row.state == "NeedsUpdate"
@@ -113,17 +141,23 @@ function C.complete()
     C.changedCount = changed
     local ok, err = C.saveCache(records)
     C.status = ok and "complete" or "cache-error"
-    if not ok then print("[WorkshopSentinel client] Cache write: " .. tostring(err)) end
+    -- Results remain usable when persistence fails.
     C.notify()
 end
 function C.start()
     if C.busy then return false end
     if now() - C.lastStart < 60000 then C.status = "cooldown"; C.notify(); return false end
-    if not getSteamModeActive() then C.status = "no-steam"; C.notify(); return false end
     local ok, rows = pcall(C.collect)
     if not ok then print("[WorkshopSentinel client] " .. tostring(rows)); C.fail("api-error"); return false end
     C.lastStart, C.scanRows = now(), rows
-    if #rows == 0 then C.rows = {}; C.status = "empty"; C.notify(); return false end
+    if not getSteamModeActive() or #rows == 0 then
+        if #(C.localRows or {}) > 0 then
+            C.scanRows = {}; C.complete()
+            if C.status == "complete" then C.status = "local-only"; C.notify() end
+            return true
+        end
+        C.rows = {}; C.status = getSteamModeActive() and "empty" or "no-steam"; C.notify(); return false
+    end
     C.busy, C.cursor, C.nextAt = true, 1, now()
     C.generation = C.generation + 1
     C.status = "checking"
@@ -194,11 +228,12 @@ function C.changelog(row)
             table.insert(parts, modId .. "\n" .. table.concat(lines, "\n"))
         end)
         if reader then pcall(function() reader:close() end) end
-        if not ok then print("[WorkshopSentinel client] Could not read ChangeLog: " .. modId) end
+        if not ok then C.reportFailure("ChangeLog " .. modId, "File unavailable; results retained")
+        else C.reportRecovery("ChangeLog " .. modId) end
     end
     return table.concat(parts, "\n\n")
 end
 C.loadCache()
-print("[WorkshopSentinel client] Model loaded v0.4.9; client updates do not use the Java bridge")
+print("[WorkshopSentinel client] Model loaded v0.4.10; client updates do not use the Java bridge")
 -- UI frames run in the main menu too; OnTick is not reliable before entering a world.
 Events.OnPreUIDraw.Add(C.tick)

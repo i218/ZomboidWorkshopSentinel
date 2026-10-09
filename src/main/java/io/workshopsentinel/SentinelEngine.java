@@ -13,12 +13,14 @@ public final class SentinelEngine {
     private final GameAdapter game;
     private final RestartAction restart;
     private final Logger log;
+    private final FailureReporter failures;
     private State state = State.NORMAL;
     private final Set<String> updates = new LinkedHashSet<>();
     private long detectedAt, nextPoll, countdownAt, retryAt, lastReminder = -1;
 
     public SentinelEngine(Config config, GameAdapter game, RestartAction restart, Logger log) {
         this.config = config; this.game = game; this.restart = restart; this.log = log;
+        failures = new FailureReporter(log);
     }
     public State state() { return state; }
     public Set<String> updates() { return Collections.unmodifiableSet(new LinkedHashSet<>(updates)); }
@@ -45,8 +47,9 @@ public final class SentinelEngine {
         try {
             count = game.playerCount();
             if (count < 0) throw new IllegalStateException("Unknown player count");
+            failures.recovered("Player count");
         } catch (Exception e) {
-            log.log(Level.WARNING, "Player count unavailable; restart postponed", e);
+            failures.failed("Player count", "Restart postponed; retry at next player poll", e);
             retryAt = nextPoll;
             return;
         }
@@ -71,17 +74,18 @@ public final class SentinelEngine {
     private void requestRestart(String reason, long now) {
         try {
             restart.request(reason, updates(), now - detectedAt);
+            failures.recovered("Restart preparation");
             transition(State.RESTARTING);
         } catch (Exception e) {
             retryAt = now + config.pollSeconds * 1000;
-            log.log(Level.SEVERE, "Restart request preparation failed; will retry without shutdown", e);
+            failures.failed("Restart preparation", "Will retry at next player poll without shutdown", e);
         }
     }
     private String prefix() { return config.dryRun ? "[DRY RUN — no actual shutdown] " : ""; }
     private boolean announce(String message) {
         log.info(message);
-        try { game.broadcast(message); return true; }
-        catch (Exception e) { log.log(Level.WARNING, "Chat delivery failed", e); return false; }
+        try { game.broadcast(message); failures.recovered("Chat delivery"); return true; }
+        catch (Exception e) { failures.failed("Chat delivery", "Countdown requires a successful warning", e); return false; }
     }
     private void transition(State next) { log.info("State " + state + " -> " + next); state = next; }
 }

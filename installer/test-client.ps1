@@ -30,7 +30,10 @@ $files = @(
     $translationFixture,
     (Join-Path $PSScriptRoot 'client-ui-bootstrap.lua'),
     (Join-Path $project '42\media\lua\client\WorkshopSentinelClientUI.lua'),
-    (Join-Path $PSScriptRoot 'client-ui-tests.lua')
+    (Join-Path $PSScriptRoot 'client-ui-tests.lua'),
+    (Join-Path $PSScriptRoot 'mlos-bootstrap.lua'),
+    (Join-Path $project '42\media\lua\client\WorkshopSentinelMLOSCompat.lua'),
+    (Join-Path $PSScriptRoot 'mlos-tests.lua')
 )
 & (Join-Path $GameDirectory 'jre64\bin\java.exe') -cp ($classes + ';' + (Join-Path $GameDirectory 'projectzomboid.jar')) KahluaClientTests @files
 if ($LASTEXITCODE -ne 0) { throw 'Client Lua tests failed' }

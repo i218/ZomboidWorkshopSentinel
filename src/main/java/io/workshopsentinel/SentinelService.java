@@ -10,6 +10,7 @@ import java.util.logging.*;
 public final class SentinelService implements AutoCloseable {
     private final Config config;
     private final Logger log;
+    private final FailureReporter failures;
     private final ScheduledExecutorService worker;
     private final AtomicReference<Set<String>> results = new AtomicReference<>();
     private final SentinelEngine engine;
@@ -22,6 +23,7 @@ public final class SentinelService implements AutoCloseable {
     public SentinelService(Config config, GameAdapter game, WorkshopUpdateProvider provider,
                            ShutdownAdapter shutdown, LongSupplier clock, Logger log) {
         this.config = config; this.shutdown = shutdown; this.clock = clock; this.log = log;
+        failures = new FailureReporter(log);
         engine = new SentinelEngine(config, game, (reason, ids, age) -> {
             RestartMarker.write(config.markerFile, config.dryRun, config.shutdownEnabled,
                 config.shutdownAdapter, reason, ids, age);
@@ -44,9 +46,10 @@ public final class SentinelService implements AutoCloseable {
                     if (old != null) merged.addAll(old);
                     return Collections.unmodifiableSet(merged);
                 });
+                failures.recovered("Workshop check");
                 log.info("Workshop check completed: configured=" + ids.size() + " updates=" + found);
             } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
-            catch (Exception e) { log.log(Level.WARNING, "Workshop check failed; pending update timer unchanged", e); }
+            catch (Exception e) { failures.failed("Workshop check", "Retry at the next scheduled check; pending update timer unchanged", e); }
         }, 0, config.checkSeconds, TimeUnit.SECONDS);
     }
     public void onTick() {

@@ -17,6 +17,7 @@ local function updatedDate(stamp)
     return tostring(stamp or "")
 end
 local statusText = {
+    ["local-only"] = "UI_WorkshopSentinel_LocalOnly",
     checking = "UI_WorkshopSentinel_CheckingWorkshop",
     complete = "UI_WorkshopSentinel_CheckcompleteChangesarecomparedwiththeprevioussession",
     empty = "UI_WorkshopSentinel_NoactiveWorkshopmodsLocalmodsareskipped",
@@ -29,7 +30,7 @@ local statusText = {
     reset = "UI_WorkshopSentinel_CacheclearedNextscancreatesanewbaseline"
 }
 local options = PZAPI.ModOptions:create("WorkshopSentinel", "WorkshopSentinel")
-print("[WorkshopSentinel client] UI loaded v0.4.9; Mod Options registered")
+print("[WorkshopSentinel client] UI loaded v0.4.10; Mod Options registered")
 options:addTickBox("autoPopup", getText("UI_WorkshopSentinel_Showwindowwhenchangesarefound"), true)
 options:addTickBox("changedOnly", getText("UI_WorkshopSentinel_Showchangedmodsonly"), true)
 local function enabled(id) return options:getOption(id):getValue() end
@@ -47,7 +48,8 @@ function Window:initialise()
         local label = r.title or r.id
         list:drawText(label, 8, y + 3, 1, 1, 1, 1, UIFont.Small)
         local state = r.available and getText("UI_WorkshopSentinel_Updateavailable")
-            or r.changed and getText("UI_WorkshopSentinel_Changedsinceprevioussession") or r.state or ""
+            or r.changed and getText("UI_WorkshopSentinel_Changedsinceprevioussession")
+            or r.localMod and getText("UI_WorkshopSentinel_LocalMod") or r.state or ""
         list:drawText(state, 8, y + 22, 0.75, 0.85, 1, 1, UIFont.Small)
         return y + list.itemheight
     end
@@ -60,11 +62,11 @@ function Window:initialise()
         b:initialise(); self:addChild(b); return b
     end
     local bw = math.floor((self.width - 48) / 3)
-    button(getText("UI_WorkshopSentinel_OpenWorkshop"), 12, bw, function(w)
-        if w.selectedRow then activateSteamOverlayToWorkshopItem(w.selectedRow.id) end
+    self.workshopButton = button(getText("UI_WorkshopSentinel_OpenWorkshop"), 12, bw, function(w)
+        if w.selectedRow and not w.selectedRow.localMod then activateSteamOverlayToWorkshopItem(w.selectedRow.id) end
     end)
-    button(getText("UI_WorkshopSentinel_Copylink"), 24 + bw, bw, function(w)
-        if w.selectedRow then Clipboard.setClipboard("https://steamcommunity.com/sharedfiles/filedetails/?id=" .. w.selectedRow.id) end
+    self.copyButton = button(getText("UI_WorkshopSentinel_Copylink"), 24 + bw, bw, function(w)
+        if w.selectedRow and not w.selectedRow.localMod then Clipboard.setClipboard("https://steamcommunity.com/sharedfiles/filedetails/?id=" .. w.selectedRow.id) end
     end)
     button(getText("UI_WorkshopSentinel_Close"), 36 + 2 * bw, bw, Window.close)
     self:refresh()
@@ -82,6 +84,7 @@ end
 function Window:refresh()
     local selectedId = self.selectedRow and self.selectedRow.id
     self.list:clear(); self.selectedRow = nil
+    self.workshopButton:setEnable(false); self.copyButton:setEnable(false)
     for _, row in ipairs(self.testRows or C.rows) do
         if self.testRows or not enabled("changedOnly") or row.available or row.changed then self.list:addItem(row.title, row) end
     end
@@ -95,10 +98,13 @@ function Window:refresh()
 end
 function Window:selectRow(row)
     self.selectedRow = row
+    self.workshopButton:setEnable(not row.localMod); self.copyButton:setEnable(not row.localMod)
     local previous = C.baseline[row.id]
     local changelog = row.testChangelog or C.changelog(row)
-    local text = plain(row.title) .. " <LINE> Workshop ID: " .. row.id .. " <LINE> " .. plain(row.version)
-        .. " <LINE> Steam: " .. plain(row.state) .. " <LINE> " .. getText("UI_WorkshopSentinel_Steamupdatedate") .. updatedDate(row.updated)
+    local text = plain(row.title) .. " <LINE> " .. plain(row.version)
+    if row.localMod then text = text .. " <LINE> " .. getText("UI_WorkshopSentinel_LocalMod")
+    else text = text .. " <LINE> Workshop ID: " .. row.id .. " <LINE> Steam: " .. plain(row.state)
+        .. " <LINE> " .. getText("UI_WorkshopSentinel_Steamupdatedate") .. updatedDate(row.updated) end
     if previous then text = text .. " <LINE> " .. getText("UI_WorkshopSentinel_Previoussession") .. plain(previous.version) end
     text = text .. " <LINE> <LINE> " .. (changelog ~= "" and plain(changelog) or getText("UI_WorkshopSentinel_NolocalChangeLogtxt"))
     self.details:setText(text); self.details:paginate()
@@ -118,7 +124,7 @@ end)
 local function notifyChanges()
     local main = MainScreen and MainScreen.instance
     if not main or main.inGame or not main.bottomPanel or not main.bottomPanel:getIsVisible() then return end
-    if C.status ~= "complete" and C.status ~= "cache-error" then return end
+    if C.status ~= "complete" and C.status ~= "cache-error" and C.status ~= "local-only" then return end
     local changed = {}
     for _, row in ipairs(C.rows) do
         if row.available or row.changed then table.insert(changed, row.id .. ":" .. tostring(row.updated) .. ":" .. row.version .. ":" .. tostring(row.state)) end

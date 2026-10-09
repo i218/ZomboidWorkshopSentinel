@@ -49,3 +49,10 @@ local requests=#testRequests
 MainScreen.instance.workshopSentinelButton.onclick()
 assert(C.window and #testRequests==requests,"Viewing results never requests a scan")
 assert(#C.window.children==5,"Two content panels and three buttons; no Check button")
+
+C.open({{id="local:OtherLocal",title="Other local mod",version="OtherLocal=2",localMod=true,state="Local",updated=0,changed=true,mods={}}})
+local oldOverlay,oldClipboard=testOverlay,testClipboard
+C.window.children[3].onclick(C.window); C.window.children[4].onclick(C.window)
+assert(testOverlay==oldOverlay and testClipboard==oldClipboard,"Local row has no fabricated Workshop action")
+assert(not C.window.details.text:match("Workshop ID:"),"Local details do not pretend to have Steam metadata")
+C.window:close()

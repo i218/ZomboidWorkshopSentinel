@@ -10,14 +10,21 @@ using System.Text.RegularExpressions;
 using System.Security.Cryptography;
 
 [assembly: AssemblyTitle("WorkshopSentinel Setup")]
-[assembly: AssemblyVersion("0.4.9.0")]
-[assembly: AssemblyFileVersion("0.4.9.0")]
+[assembly: AssemblyVersion("0.4.10.0")]
+[assembly: AssemblyFileVersion("0.4.10.0")]
 
 class Setup {
     static string DefaultDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Zomboid");
     static string Operation = "Запуск", CurrentPath = "";
+    internal static string FileErrorHint(Exception e) {
+        if(e is UnauthorizedAccessException || e is System.Security.SecurityException)
+            return "Доступ запрещён. Проверьте права учётной записи на указанный путь, атрибут Только чтение и блокировку файла. Установщик не изменяет права доступа автоматически.";
+        if(e is IOException)
+            return "Проверьте, что путь имеет правильный тип (файл или папка), доступен диск и файлы не заблокированы запущенной игрой или сервером. После устранения причины повторите установку.";
+        return "";
+    }
     static string ErrorDetails(Exception e) {
-        string report="Операция: "+Operation+"\nПуть: "+CurrentPath+"\n\n"+e.Message;
+        string report="Операция: "+Operation+"\nПуть: "+CurrentPath+"\n\n"+e.Message+"\n"+FileErrorHint(e);
         try {
             string log=Path.Combine(Path.GetTempPath(),"WorkshopSentinel-setup-error-"+DateTime.UtcNow.ToString("yyyyMMdd-HHmmss")+".txt");
             File.WriteAllText(log,report+"\n\n"+e.ToString());
@@ -289,7 +296,7 @@ class Setup {
         TextBox dataDir=new TextBox(); ComboBox name=new ComboBox();
         CheckBox client=new CheckBox(),server=new CheckBox();
         public SetupForm() {
-            Text="WorkshopSentinel — установщик 0.4.9"; ClientSize=new Size(660,390);
+            Text="WorkshopSentinel — установщик 0.4.10"; ClientSize=new Size(660,390);
             FormBorderStyle=FormBorderStyle.FixedDialog; MaximizeBox=false; StartPosition=FormStartPosition.CenterScreen;
             AddLabel("Один мод для клиента и dedicated server. Выберите папку данных Zomboid.",18,18,620);
             FolderRow(dataDir,DefaultDir,58);

@@ -19,6 +19,7 @@ public final class SentinelTests {
         temp = Files.createTempDirectory("workshop-sentinel-tests-");
         try {
             run("safe defaults and config validation", SentinelTests::config);
+            run("file errors are bounded, actionable and report recovery", SentinelTests::fileFailures);
             run("automatic running server name and explicit override", SentinelTests::serverName);
             run("configured server WorkshopItems and explicit IDs", SentinelTests::items);
             run("distributed config blank serverIni reads the running server profile", SentinelTests::blankServerIni);
@@ -164,6 +165,43 @@ public final class SentinelTests {
         eq(new Config(relative, configFile, ini).serverIni, configFile.getParent().resolve("custom.ini"));
         relative.setProperty("serverIni", ini.toString());
         eq(new Config(relative, configFile, ini).serverIni, ini);
+    }
+    private static void fileFailures() throws Exception {
+        Logger logger = Logger.getLogger("FileFailures-" + UUID.randomUUID());
+        logger.setUseParentHandlers(false);
+        List<LogRecord> records = new ArrayList<>();
+        logger.addHandler(new Handler() {
+            public void publish(LogRecord record) { records.add(record); }
+            public void flush() { }
+            public void close() { }
+        });
+        long[] time = {0};
+        FailureReporter reporter = new FailureReporter(logger, () -> time[0]);
+        reporter.failed("Workshop check", "Retry next check", new AccessDeniedException("profile.ini"));
+        for (int i = 0; i < 10; i++) reporter.failed("Workshop check", "Retry next check", new AccessDeniedException("profile.ini"));
+        eq(records.size(), 1); eq(records.get(0).getThrown(), null);
+        if (!records.get(0).getMessage().contains("permissions")) throw new AssertionError("Actionable access-denied hint required");
+        time[0] = 600000;
+        reporter.failed("Workshop check", "Retry next check", new AccessDeniedException("profile.ini"));
+        eq(records.size(), 2);
+        reporter.recovered("Workshop check"); eq(records.size(), 3);
+        reporter.recovered("Workshop check"); eq(records.size(), 3);
+        reporter.failed("Workshop check", "Retry next check", new NoSuchFileException("missing.ini"));
+        eq(records.size(), 4); eq(records.get(3).getThrown(), null);
+        Path folder = Files.createTempDirectory(temp, "invalid-ini-");
+        Properties p = new Properties(); p.setProperty("serverIni", folder.toString());
+        Config bad = new Config(p, folder.resolve("config.properties"), folder.resolve("server.ini"));
+        try { bad.configuredWorkshopIds(); throw new AssertionError("Directory must not be read as ini"); }
+        catch (FileSystemException expected) {
+            if (!expected.getReason().contains("not a directory")) throw new AssertionError("Expected path-type diagnosis");
+        }
+        Config c = cfg(); Game game = new Game(); game.players = 0;
+        boolean[] denied = {true};
+        SentinelEngine engine = new SentinelEngine(c, game, (reason, ids, age) -> {
+            if (denied[0]) throw new AccessDeniedException("restart-marker.properties");
+        }, logger);
+        engine.found(IDS, 0); engine.tick(0); eq(engine.state(), SentinelEngine.State.UPDATE_PENDING);
+        denied[0] = false; engine.tick(c.pollSeconds * 1000); eq(engine.state(), SentinelEngine.State.RESTARTING);
     }
     private static void empty() throws Exception {
         Scenario s = new Scenario(); s.game.players = 0; s.start(); s.engine.tick(10000);

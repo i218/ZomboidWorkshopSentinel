@@ -37,7 +37,8 @@ public final class Config {
 
     public static Config load(Path file, Path defaultIni) throws IOException {
         Properties p = new Properties();
-        if (Files.exists(file)) try (Reader r = Files.newBufferedReader(file, StandardCharsets.UTF_8)) { p.load(r); }
+        try (Reader r = Files.newBufferedReader(file, StandardCharsets.UTF_8)) { p.load(r); }
+        catch (NoSuchFileException missing) { /* A genuinely absent config uses documented safe defaults. */ }
         return new Config(p, file, defaultIni);
     }
     private Path path(Properties p, String key, String fallback) {
@@ -67,6 +68,7 @@ public final class Config {
     }
     public Set<String> configuredWorkshopIds() throws IOException {
         if (!explicitIds.isEmpty()) return explicitIds;
+        if (Files.isDirectory(serverIni)) throw new FileSystemException(serverIni.toString(), null, "serverIni must be an .ini file, not a directory");
         for (String line : Files.readAllLines(serverIni, StandardCharsets.UTF_8)) {
             String value = line.trim();
             if (value.startsWith("WorkshopItems=")) return ids(value.substring("WorkshopItems=".length()));

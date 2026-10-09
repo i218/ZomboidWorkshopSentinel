@@ -3,7 +3,7 @@
 if isServer() or isClient() then return end
 
 local function itemId(item)
-    local data = item.item
+    local data = item and item.item or {}
     return data.modID or data.modId or ""
 end
 
@@ -23,10 +23,14 @@ local function install()
         local filtered, localEntries, hasLocal = {}, {}, false
         for i, item in ipairs(items) do
             local id = itemId(item)
-            local own = id == "WorkshopSentinel" or id == "\\WorkshopSentinel"
-            local info = item.item.modInfo
-            local workshopId = own and info and self:getWorkshopId(info) or nil
-            if own and info and (workshopId == nil or workshopId == "") then
+            local info = item.item and item.item.modInfo
+            if not info and id ~= "" then
+                local found, value = pcall(getModInfoByID, id:gsub("^\\", ""))
+                if found then info = value end
+            end
+            local identified, workshopId = false, nil
+            if info then identified, workshopId = pcall(self.getWorkshopId, self, info) end
+            if id ~= "" and info and identified and (workshopId == nil or workshopId == "" or tostring(workshopId) == "0") then
                 localEntries[i] = true
                 hasLocal = true
             else
@@ -52,7 +56,7 @@ local function install()
         return ordered, workshopIDs
     end
     utils._workshopSentinelLocalCompat = true
-    print("[WorkshopSentinel] MLOS compatibility enabled: local mod retained without Workshop ID")
+    print("[WorkshopSentinel] MLOS compatibility enabled: installed local mods retained without Workshop IDs")
 end
 
 Events.OnMainMenuEnter.Add(install)
