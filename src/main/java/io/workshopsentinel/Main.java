@@ -18,7 +18,7 @@ public final class Main {
             // Default exposure retains the canonical global WorkshopSentinelBridge.
             exposer.getMethod("exposeClass", Class.class).invoke(null, WorkshopSentinelBridge.class);
             registered = true;
-            LOG.info("Java bridge registered v0.4.10; awaiting server OnTick. Dedicated-server guard is deferred until tick.");
+            LOG.info("Java bridge registered v0.4.11; awaiting server OnTick. Dedicated-server guard is deferred until tick.");
         } catch (Exception e) {
             LOG.log(Level.SEVERE, "ZombieBuddy Exposer API unavailable; mod disabled. TODO verify deployed ZombieBuddy version", e);
         }
@@ -47,9 +47,11 @@ public final class Main {
                 Files.createDirectories(c.directory);
                 try {
                     FileHandler handler = new FileHandler(c.directory.resolve("WorkshopSentinel-%g.log").toString(), 1024 * 1024, 3, true);
-                    handler.setEncoding("UTF-8"); handler.setFormatter(new SimpleFormatter()); LOG.addHandler(handler);
+                    handler.setEncoding("UTF-8"); handler.setFormatter(new SimpleFormatter()); LOG.addHandler(handler); LOG.setUseParentHandlers(false);
                 } catch (java.io.IOException | SecurityException loggingFailure) {
-                    new FailureReporter(LOG).failed("File logging", "Console logging remains active; monitoring continues", loggingFailure);
+                    ConsoleHandler console = new ConsoleHandler(); console.setLevel(Level.WARNING);
+                    LOG.addHandler(console); LOG.setUseParentHandlers(false);
+                    new FailureReporter(LOG).failed("File logging", "Only warnings/errors go to console until JVM restart; monitoring continues", loggingFailure);
                 }
                 PzGameAdapter game = new PzGameAdapter();
                 if (c.clientOptional) OptionalClientModAdapter.apply(LOG);

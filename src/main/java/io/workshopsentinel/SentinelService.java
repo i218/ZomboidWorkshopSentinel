@@ -17,6 +17,7 @@ public final class SentinelService implements AutoCloseable {
     private final LongSupplier clock;
     private long lastTick = Long.MIN_VALUE;
     private volatile boolean closed;
+    private Set<String> lastConfigured, lastUpdates;
     private boolean shutdownPending;
     private final ShutdownAdapter shutdown;
 
@@ -38,7 +39,7 @@ public final class SentinelService implements AutoCloseable {
             if (closed) return;
             try {
                 Set<String> ids = config.configuredWorkshopIds();
-                if (ids.isEmpty()) log.warning("WorkshopItems is empty; no items to monitor");
+                if (ids.isEmpty() && !ids.equals(lastConfigured)) log.warning("WorkshopItems is empty; no items to monitor");
                 Set<String> found = provider.check(ids);
                 if (!ids.containsAll(found)) throw new IllegalStateException("Provider returned unconfigured IDs");
                 if (!found.isEmpty()) results.updateAndGet(old -> {
@@ -47,7 +48,9 @@ public final class SentinelService implements AutoCloseable {
                     return Collections.unmodifiableSet(merged);
                 });
                 failures.recovered("Workshop check");
-                log.info("Workshop check completed: configured=" + ids.size() + " updates=" + found);
+                if (!ids.equals(lastConfigured) || !found.equals(lastUpdates))
+                    log.info("Workshop check completed: configured=" + ids.size() + " updates=" + found);
+                lastConfigured = new LinkedHashSet<>(ids); lastUpdates = new LinkedHashSet<>(found);
             } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
             catch (Exception e) { failures.failed("Workshop check", "Retry at the next scheduled check; pending update timer unchanged", e); }
         }, 0, config.checkSeconds, TimeUnit.SECONDS);

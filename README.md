@@ -8,7 +8,7 @@ A mod for **Project Zomboid Build 42 Dedicated Server** with ZombieBuddy install
 
 ## One mod for the client and server
 
-**WorkshopSentinel 0.4.10 uses one folder, one mod ID, and one package.** It contains a Java server monitor, a Lua client update checker, and support for the server settings editor with MLOS. The runtime environment determines which code runs.
+**WorkshopSentinel 0.4.11 uses one folder, one mod ID, and one package.** It contains a Java server monitor, a Lua client update checker, and support for the server settings editor with MLOS. The runtime environment determines which code runs.
 
 ### Windows installation
 
@@ -259,3 +259,5 @@ The client automatically compares local `modversion` metadata, including when St
 File failures report the operation, path and corrective action. Repeated identical failures are summarized at most once per ten minutes, with recovery logged on success. Workshop checks retry on their normal interval; failed restart-marker writes postpone shutdown and retry at the player poll. Unreadable configuration or a required installed baseline disables initialization until corrected and restarted. Failure to open the log file keeps console logging and monitoring active. Client cache failures retain results and the memory baseline. The installer reports permissions, path-type and file-lock hints and retains its rollback behavior. No permissions or ZombieBuddy trust settings are changed. Errors emitted by other mods remain under those mods' control.
 
 The installer selects the existing "servertest" profile first (case-insensitive). If absent, it retains the previous listed selection or selects the first profile.
+
+Logging (0.4.11): the mod file records startup, one baseline summary, changed check results, state transitions, errors and recovery. Per-item baselines and unchanged periodic results are omitted. Successful file logging disables console duplication. If the log cannot be opened, only warnings/errors go to console. Early bootstrap failures remain visible.

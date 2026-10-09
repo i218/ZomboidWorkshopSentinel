@@ -1,7 +1,7 @@
 plugins { id 'java' }
 
 group = 'io.workshopsentinel'
-version = '0.4.10'
+version = '0.4.11'
 def localSigning = new Properties()
 def signingFile = file('signing.local.properties')
 if (signingFile.exists()) signingFile.withInputStream { localSigning.load(it) }

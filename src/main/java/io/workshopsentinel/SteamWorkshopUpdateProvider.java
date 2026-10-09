@@ -67,13 +67,15 @@ public final class SteamWorkshopUpdateProvider implements WorkshopUpdateProvider
             Long installed = baseline.get(item.getKey());
             if (installed != null && item.getValue() > installed) updates.add(item.getKey());
         }
+        int initialized = 0;
         for (Map.Entry<String, Long> item : current.entrySet()) {
             if (!baseline.containsKey(item.getKey())) {
                 baseline.put(item.getKey(), item.getValue());
-                log.info("Steam session baseline id=" + item.getKey() + " time_updated=" + item.getValue()
-                    + "; installed revision not verified");
+                initialized++;
             }
         }
+        if (initialized > 0) log.info("Steam session baseline initialized for " + initialized
+            + " item(s); installed revisions not verified");
         return updates;
     }
     public static Map<String, Long> parse(String xml, Set<String> expected) throws Exception {
