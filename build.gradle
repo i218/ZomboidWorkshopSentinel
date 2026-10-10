@@ -1,7 +1,7 @@
 plugins { id 'java' }
 
 group = 'io.workshopsentinel'
-version = '0.4.11'
+version = '0.4.12'
 def localSigning = new Properties()
 def signingFile = file('signing.local.properties')
 if (signingFile.exists()) signingFile.withInputStream { localSigning.load(it) }
@@ -66,6 +66,7 @@ tasks.register('modZip', Zip) {
         into('common') { from('common') }
         into('config') { from('config') }
         into('docs') { from('docs') }
+        into('client-support') { from('client-support') }
         from('README.md', 'README.ru.md', 'VERIFICATION.md')
     }
     exclude '**/.gitkeep'

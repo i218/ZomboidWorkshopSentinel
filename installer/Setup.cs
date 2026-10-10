@@ -10,8 +10,8 @@ using System.Text.RegularExpressions;
 using System.Security.Cryptography;
 
 [assembly: AssemblyTitle("WorkshopSentinel Setup")]
-[assembly: AssemblyVersion("0.4.11.0")]
-[assembly: AssemblyFileVersion("0.4.11.0")]
+[assembly: AssemblyVersion("0.4.12.0")]
+[assembly: AssemblyFileVersion("0.4.12.0")]
 
 class Setup {
     static string DefaultDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Zomboid");
@@ -69,6 +69,7 @@ class Setup {
             if (!client && !server) throw new Exception("Выберите клиент или сервер.");
             if (server && (String.IsNullOrWhiteSpace(name) || !Regex.IsMatch(name,@"^[A-Za-z0-9_.-]+$") || name=="." || name=="..")) throw new Exception("Недопустимое имя сервера.");
         CheckOwned(dataDir);
+        if(client) CheckOwned(dataDir,"WorkshopSentinelClient");
         string ini=Path.Combine(dataDir,"Server",name+".ini");
         string profile=Path.Combine(dataDir,"mods","default.txt");
         // Validate all selected settings before replacing any mod files.
@@ -83,6 +84,7 @@ class Setup {
         using (var zip=new ZipArchive(payload,ZipArchiveMode.Read)) {
                 ValidatePayload(zip);
                 Deploy(zip,"WorkshopSentinel/",dataDir);
+                if(client) Deploy(zip,"WorkshopSentinel/client-support/WorkshopSentinelClient/",dataDir);
                 VerifyJar(zip,Path.Combine(dataDir,"mods","WorkshopSentinel","42","media","java","WorkshopSentinel.jar"));
                 bool signed=zip.GetEntry("WorkshopSentinel/42/media/java/WorkshopSentinel.jar.zbs")!=null;
                 if(server) {
@@ -104,7 +106,7 @@ class Setup {
         }
     }
     static void ValidatePayload(ZipArchive zip) {
-        foreach(string file in new[]{"42/mod.info","42/media/java/WorkshopSentinel.jar","config/WorkshopSentinel.properties","42/media/lua/client/WorkshopSentinelClientUI.lua","42/media/lua/shared/Translate/RU/UI.json"})
+        foreach(string file in new[]{"42/mod.info","42/media/java/WorkshopSentinel.jar","config/WorkshopSentinel.properties","client-support/WorkshopSentinelClient/42/mod.info","client-support/WorkshopSentinelClient/42/media/lua/client/WorkshopSentinelClientUI.lua","client-support/WorkshopSentinelClient/42/media/lua/shared/Translate/RU/UI.json"})
             if(zip.GetEntry("WorkshopSentinel/"+file)==null) throw new IOException("Установщик повреждён: нет "+file);
         using(var input=zip.GetEntry("WorkshopSentinel/42/media/java/WorkshopSentinel.jar").Open())
         using(var copy=new MemoryStream()) {
@@ -136,6 +138,7 @@ class Setup {
         var ids=new List<string>(value.Split(new[]{';'},StringSplitOptions.RemoveEmptyEntries));
         foreach(string id in ids) if(id.Trim().TrimStart('\\')=="ServerAutoUpdate_B42") throw new IOException("Отключите ServerAutoUpdate_B42 в выбранном сервере: он конфликтует с WorkshopSentinel.");
         bool slash=value.Contains("\\");
+        ids.RemoveAll(id=>id.Trim().TrimStart((char)92)=="WorkshopSentinelClient");
         foreach(string required in new[]{"ZombieBuddy","WorkshopSentinel"}) {
             bool found=false; foreach(string id in ids) if(id.Trim().TrimStart('\\')==required) found=true;
             if(!found) ids.Add((slash?"\\":"")+required);
@@ -148,10 +151,12 @@ class Setup {
         if(blocks.Count!=1) throw new IOException("Не удалось прочитать профиль клиентских модов default.txt. Файл сохранён без изменений.");
         var block=blocks[0]; string body=block.Groups["body"].Value;
         if(Regex.IsMatch(body,@"(?m)^\s*mod\s*=\s*\\?ServerAutoUpdate_B42\s*,?\s*$")) throw new IOException("Отключите ServerAutoUpdate_B42 в клиентском профиле: он конфликтует с WorkshopSentinel.");
-        if(Regex.IsMatch(body,@"(?m)^\s*mod\s*=\s*\\?WorkshopSentinel\s*,?\s*$")) return text;
         string newline=text.Contains("\r\n")?"\r\n":"\n";
         int close=block.Index+block.Length-1;
-        return text.Insert(close,"    mod = WorkshopSentinel,"+newline);
+        string addition="";
+        foreach(string id in new[]{"WorkshopSentinel","WorkshopSentinelClient"})
+            if(!Regex.IsMatch(body,@"(?m)^\s*mod\s*=\s*\\?"+Regex.Escape(id)+@"\s*,?\s*$")) addition+="    mod = "+id+","+newline;
+        return text.Insert(close,addition);
     }
     static void ApplySettings(Dictionary<string,string> settings,string dataDir) {
         string backup=Path.Combine(dataDir,"WorkshopSentinel-installer-backups","settings-"+Guid.NewGuid().ToString("N"));
@@ -204,26 +209,28 @@ class Setup {
             File.Move(info,backup);
         }
     }
-    static void CheckOwned(string dataDir) {
-        string target=Path.Combine(dataDir,"mods","WorkshopSentinel");
+    static void CheckOwned(string dataDir,string modId="WorkshopSentinel") {
+        string target=Path.Combine(dataDir,"mods",modId);
         At("Проверка существующего мода",target);
         if (File.Exists(target)) throw new Exception("Путь занят файлом: "+target);
         if (!Directory.Exists(target)) return;
         string info=Path.Combine(target,"42","mod.info");
         bool own=false;
-        if (File.Exists(info)) foreach(string line in File.ReadAllLines(info)) if (line.Trim()=="id=WorkshopSentinel") own=true;
+        if (File.Exists(info)) foreach(string line in File.ReadAllLines(info)) if (line.Trim()=="id="+modId) own=true;
         if (!own) throw new Exception("Не удалось подтвердить существующую установку WorkshopSentinel: "+target);
     }
     static void Deploy(ZipArchive zip,string prefix,string dataDir) {
         string mods=Path.Combine(dataDir,"mods");
         At("Создание папки mods",mods);
         Directory.CreateDirectory(mods);
-        string target=Path.Combine(mods,"WorkshopSentinel");
+        string modId=prefix.EndsWith("WorkshopSentinelClient/",StringComparison.Ordinal)?"WorkshopSentinelClient":"WorkshopSentinel";
+        string target=Path.Combine(mods,modId);
         string staging=Path.Combine(dataDir,"WorkshopSentinel-installer-work","install-"+Guid.NewGuid().ToString("N"));
         At("Подготовка файлов",staging);
         Directory.CreateDirectory(staging);
         foreach(var entry in zip.Entries) {
             if (!entry.FullName.StartsWith(prefix,StringComparison.Ordinal) || entry.FullName.EndsWith("/")) continue;
+            if(modId=="WorkshopSentinel" && entry.FullName.StartsWith(prefix+"client-support/",StringComparison.Ordinal)) continue;
             string rel=entry.FullName.Substring(prefix.Length).Replace('/',Path.DirectorySeparatorChar);
             string dest=Path.GetFullPath(Path.Combine(staging,rel));
             if (!dest.StartsWith(staging+Path.DirectorySeparatorChar,StringComparison.OrdinalIgnoreCase)) throw new Exception("Invalid payload path.");
@@ -255,6 +262,13 @@ class Setup {
                 Directory.CreateDirectory(Path.GetDirectoryName(dest));
                 WriteFile(file,dest);
                 changed.Add(dest);
+            }
+            if(modId=="WorkshopSentinel") {
+                foreach(string rel in new[]{"42/media/lua/client/WorkshopSentinelClientModel.lua","42/media/lua/client/WorkshopSentinelClientUI.lua","42/media/lua/client/WorkshopSentinelMLOSCompat.lua","42/media/lua/shared/Translate/EN/UI.json","42/media/lua/shared/Translate/RU/UI.json"}) {
+                    string obsolete=Path.GetFullPath(Path.Combine(target,rel.Replace('/',Path.DirectorySeparatorChar)));
+                    if(!obsolete.StartsWith(target+Path.DirectorySeparatorChar,StringComparison.OrdinalIgnoreCase)) throw new IOException("Invalid migration path");
+                    if(File.Exists(obsolete)) { At("Перенос устаревшего клиентского файла",obsolete); File.Delete(obsolete); changed.Add(obsolete); }
+                }
             }
         } catch (Exception original) {
             string failedOperation=Operation,failedPath=CurrentPath;
@@ -296,7 +310,7 @@ class Setup {
         TextBox dataDir=new TextBox(); ComboBox name=new ComboBox();
         CheckBox client=new CheckBox(),server=new CheckBox();
         public SetupForm() {
-            Text="WorkshopSentinel — установщик 0.4.11"; ClientSize=new Size(660,390);
+            Text="WorkshopSentinel — установщик 0.4.12"; ClientSize=new Size(660,390);
             FormBorderStyle=FormBorderStyle.FixedDialog; MaximizeBox=false; StartPosition=FormStartPosition.CenterScreen;
             AddLabel("Один мод для клиента и dedicated server. Выберите папку данных Zomboid.",18,18,620);
             FolderRow(dataDir,DefaultDir,58);

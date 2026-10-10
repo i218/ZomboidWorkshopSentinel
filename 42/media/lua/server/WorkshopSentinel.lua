@@ -1,6 +1,6 @@
 -- Loaded only by the dedicated server. Java API is registered by Main.main.
 if not isServer() then return end
-print('[WorkshopSentinel server] Lua bootstrap v0.4.11 loaded; waiting for ZombieBuddy Java bridge')
+print('[WorkshopSentinel server] Lua bootstrap v0.4.12 loaded; waiting for ZombieBuddy Java bridge')
 local reportedMissing = false
 local failed = false
 local function tick()
@@ -18,4 +18,6 @@ local function tick()
         print('[WorkshopSentinel] Bridge failed; monitoring disabled until JVM restart: ' .. tostring(err))
     end
 end
-Events.OnTick.Add(tick)
+-- Initialize before first handshake; PauseEmpty must not block the first player.
+Events.OnServerStarted.Add(tick)
+Events.OnTickEvenPaused.Add(tick)

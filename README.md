@@ -6,9 +6,9 @@ A mod for **Project Zomboid Build 42 Dedicated Server** with ZombieBuddy install
 
 **Dry-run is enabled by default: the server keeps running.**
 
-## One mod for the client and server
+## One installer for the client and server
 
-**WorkshopSentinel 0.4.11 uses one folder, one mod ID, and one package.** It contains a Java server monitor, a Lua client update checker, and support for the server settings editor with MLOS. The runtime environment determines which code runs.
+**WorkshopSentinel 0.4.12 uses one installer and one distribution package.** The installer automatically places the server core and optional client support in their own mod folders. This keeps the client UI out of server checksums; players do not need either component to join.
 
 ### Windows installation
 
@@ -27,7 +27,7 @@ If installation fails, the dialog shows the operation, exact path, and location 
 
 ### Manual installation and Linux
 
-Extract **WorkshopSentinel-mod.zip** into `<data folder>/mods/`. It contains the same unified mod as the installer. Replace any old copy with the same mod ID rather than keeping both copies.
+Extract **WorkshopSentinel-mod.zip** into `<data folder>/mods/`. It contains the server core plus bundled client support. For a client, copy `WorkshopSentinel/client-support/WorkshopSentinelClient` to `<data folder>/mods/WorkshopSentinelClient` and enable it locally. Keep `WorkshopSentinelClient` out of the server INI. Replace any old copy with the same mod ID rather than keeping both copies.
 
 ### ZombieBuddy signing
 
@@ -37,8 +37,8 @@ An older `.jar.zbs`, if installed, is moved to a backup folder outside `mods`. T
 
 ### What runs in each environment
 
-- **Client:** the Workshop checker and settings editor support in `media/lua/client`. MLOS support keeps all installed local mods in the saved configuration without inventing a Workshop ID. These features do not need a client Java agent.
-- **Dedicated server:** the Java bootstrap at `media/java/WorkshopSentinel.jar`, loaded through ZombieBuddy, and the server Lua bridge. The monitor checks `GameServer.server` on the first server tick before starting. Client Lua does not run there.
+- **Client:** the Workshop checker and settings editor support in `WorkshopSentinelClient/42/media/lua/client`. MLOS support keeps all installed local mods in the saved configuration without inventing a Workshop ID. These features do not need a client Java agent.
+- **Dedicated server:** the Java bootstrap at `media/java/WorkshopSentinel.jar`, loaded through ZombieBuddy, and the server Lua bridge. The monitor checks `GameServer.server` at `OnServerStarted` before starting. Client Lua does not run there.
 
 Since 0.4.1, the JAR uses a neutral path instead of `media/java/server`. In the supplied Build 42.21.0 server log, ZombieBuddy 2.3.4 incorrectly skipped the server-only JAR during dedicated server startup. With ZombieBuddy on the client, the minimal Java bootstrap may now load and request approval there too, but it does not start monitoring, a scheduler, or shutdown. The client UI works without a Java agent.
 
@@ -46,7 +46,7 @@ The installer disables discovery of legacy `.WorkshopSentinel-install-*` copies 
 
 For MLOS support, enable WorkshopSentinel in the main Mods menu; the client installer does this automatically. The log should show `MLOS compatibility enabled: installed local mods retained without Workshop IDs`. MLOS files are not modified.
 
-`clientOptional=true` removes only WorkshopSentinel from the server's advertised client requirements after the first tick. Connecting without the unified mod and Lua checksum behavior **still need verification in a real game session**. A local mod has no Workshop ID; adding a published item to `WorkshopItems` may require downloading it independently of the `Mods` list.
+`clientOptional=true` removes only WorkshopSentinel from the server's advertised client requirements at server startup. Connecting without the unified mod and Lua checksum behavior **still need verification in a real game session**. A local mod has no Workshop ID; adding a published item to `WorkshopItems` may require downloading it independently of the `Mods` list.
 
 The package is ready for local installation. It has not been published to Steam Workshop.
 
@@ -261,3 +261,9 @@ File failures report the operation, path and corrective action. Repeated identic
 The installer selects the existing "servertest" profile first (case-insensitive). If absent, it retains the previous listed selection or selects the first profile.
 
 Logging (0.4.11): the mod file records startup, one baseline summary, changed check results, state transitions, errors and recovery. Per-item baselines and unchanged periodic results are omitted. Successful file logging disables console duplication. If the log cannot be opened, only warnings/errors go to console. Early bootstrap failures remain visible.
+
+## Optional client installation (0.4.12)
+
+Initialization runs on OnServerStarted, before ordinary simulation ticks. OnTickEvenPaused keeps checks and optional-client maintenance active with PauseEmpty=true. The advertised list is rechecked every five seconds; retries preserve loaded runtime mods and other client requirements.
+
+The installer automatically deploys and enables WorkshopSentinelClient for client installs. Server-only installs deploy only WorkshopSentinel. Updating removes the five legacy client/translation files from the core, with backups and rollback, so they no longer enter server client/shared checksums. Existing configuration is preserved. Keep clientOptional=true and restart the server after installation. Joining from a real client without either component remains a deployment check.

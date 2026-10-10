@@ -18,7 +18,7 @@ class SetupTests {
         Setup.Install(dir,"servertest1",true,true);
         string installed=File.ReadAllText(ini),enabled=File.ReadAllText(profile);
         Check(installed==original.Replace("Mods=\\Other;\\ZombieBuddy","Mods=\\Other;\\ZombieBuddy;\\WorkshopSentinel"),"Preserve other server settings, IDs and slash syntax");
-        Check(enabled.Contains("mod = Other") && enabled.Contains("mod = WorkshopSentinel") && enabled.Contains("map = CustomMap"),"Preserve client mods and map order");
+        Check(enabled.Contains("mod = Other") && enabled.Contains("mod = WorkshopSentinel") && enabled.Contains("mod = WorkshopSentinelClient") && enabled.Contains("map = CustomMap"),"Preserve client mods and map order");
         Check(Setup.FileErrorHint(new UnauthorizedAccessException("denied")).Contains("права"),"Access-denied diagnostic explains permissions");
         Check(Setup.FileErrorHint(new IOException("locked")).Contains("заблокированы"),"I/O diagnostic explains file locks");
         string jar=Path.Combine(dir,"mods","WorkshopSentinel","42","media","java","WorkshopSentinel.jar");
@@ -28,6 +28,11 @@ class SetupTests {
         string cfg=Path.Combine(dir,"WorkshopSentinel","servertest1","WorkshopSentinel.properties");
         Check(File.ReadAllText(cfg).Contains("dryRun=true") && File.ReadAllText(cfg).Contains("shutdownEnabled=false"),"Safe new config");
         File.WriteAllText(cfg,"# custom settings retained\nprovider=noop\n");
+        string helper=Path.Combine(dir,"mods","WorkshopSentinelClient","42","media","lua","client","WorkshopSentinelClientModel.lua");
+        Check(File.Exists(helper),"Installer automatically deploys client helper outside core mod");
+        Check(!installed.Contains("WorkshopSentinelClient"),"Client helper never enabled in server ini");
+        string legacyClient=Path.Combine(dir,"mods","WorkshopSentinel","42","media","lua","client","WorkshopSentinelClientModel.lua");
+        Directory.CreateDirectory(Path.GetDirectoryName(legacyClient));File.WriteAllText(legacyClient,"legacy client fixture");
         bool unsigned=!File.Exists(jar+".zbs");
         if(unsigned) File.WriteAllText(jar+".zbs","old signature fixture");
         Setup.Install(dir,"servertest1",true,true);
@@ -35,10 +40,14 @@ class SetupTests {
             Check(!File.Exists(jar+".zbs"),"Unsigned update removes previous signature from loading path");
             Check(Directory.GetFiles(Path.Combine(dir,"WorkshopSentinel-installer-backups"),"obsolete-signature-*.zbs").Any(p=>File.ReadAllText(p)=="old signature fixture"),"Previous signature retained outside mod discovery");
         }
+        Check(!File.Exists(legacyClient),"Old client Lua removed from server checksum path");
+        Check(Directory.GetFiles(Path.Combine(dir,"WorkshopSentinel-installer-backups"),"WorkshopSentinelClientModel.lua",SearchOption.AllDirectories).Any(p=>File.ReadAllText(p)=="legacy client fixture"),"Legacy client file backed up outside mods");
+        Check(!Directory.GetFiles(Path.Combine(dir,"mods","WorkshopSentinel","42","media","lua"),"*.lua",SearchOption.AllDirectories).Any(p=>p.Contains("\\client\\") || p.Contains("\\shared\\")),"Core mod has no client/shared Lua checksums");
         Check(File.ReadAllText(ini)==installed && File.ReadAllText(profile)==enabled,"Idempotent activation");
         Check(File.ReadAllText(cfg)=="# custom settings retained\nprovider=noop\n","Existing config preserved");
         Check(Directory.GetFiles(Path.Combine(dir,"WorkshopSentinel-installer-backups"),"*.ini",SearchOption.AllDirectories).Any(p=>File.ReadAllText(p)==original),"Original server settings backed up");
         Check(Setup.EnableServer("Mods=Other\nWorkshopItems=123\n")=="Mods=Other;ZombieBuddy;WorkshopSentinel\nWorkshopItems=123\n","Plain mod syntax");
+        Check(!Setup.EnableServer("Mods=Other;WorkshopSentinelClient\n").Contains("WorkshopSentinelClient"),"Client helper stripped from server settings");
         MustFail(()=>Setup.EnableServer("Mods=Other\nMods=Second\n"));
         MustFail(()=>Setup.EnableServer("Mods=\\ServerAutoUpdate_B42\n"));
         MustFail(()=>Setup.EnableClient("unknown profile format"));
@@ -52,6 +61,7 @@ class SetupTests {
         File.WriteAllText(Path.Combine(onlyServer,"Server","myserver.ini"),"Mods=Other\n",new UTF8Encoding(true));
         Setup.Install(onlyServer,"myserver",false,true);
         Check(!File.Exists(Path.Combine(onlyServer,"mods","default.txt")),"Server mode leaves client profile alone");
+        Check(!Directory.Exists(Path.Combine(onlyServer,"mods","WorkshopSentinelClient")),"Server-only install does not deploy client helper");
         byte[] bom=File.ReadAllBytes(Path.Combine(onlyServer,"Server","myserver.ini"));
         Check(bom[0]==239 && bom[1]==187 && bom[2]==191,"Preserve existing UTF-8 BOM");
         string locked=Path.Combine(root,"locked-settings"); Directory.CreateDirectory(Path.Combine(locked,"Server")); Directory.CreateDirectory(Path.Combine(locked,"mods"));

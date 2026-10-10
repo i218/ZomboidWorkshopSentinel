@@ -1,7 +1,7 @@
 name=WorkshopSentinel
 id=WorkshopSentinel
 description=Client Workshop update list, versions, changelogs and links; dedicated-server update monitoring with safe dry-run defaults. Requires ZombieBuddy only on the server. Conflicts with Server AutoUpdate variants.
-modversion=0.4.11
+modversion=0.4.12
 loadModAfter=\ZombieBuddy,\ModLoadOrderSorter_b42
 incompatible=\ServerAutoUpdate_B42
 javaJarFile=media/java/WorkshopSentinel.jar

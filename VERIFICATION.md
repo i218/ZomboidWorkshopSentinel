@@ -1,4 +1,4 @@
-# Проверка WorkshopSentinel 0.4.10 — 2026-10-09
+# Проверка WorkshopSentinel 0.4.12 — 2026-10-10
 
 ## Что поставляется
 
@@ -93,3 +93,13 @@ MLOS-обработчик расширен на все установленны�
 FailureReporter классифицирует AccessDeniedException, SecurityException, отсутствующий файл и неправильный тип пути; одинаковые ошибки группируются на десять минут с уведомлением о восстановлении. Проверены suppression, повторная диагностика после интервала, recovery, ошибка directory-as-ini и отказ подготовки маркера с последующим восстановлением. Ошибка маркера не разрешает shutdown. Ошибка файла лога допускает только console logging; недоступный конфиг не заменяется молча безопасными defaults (только NoSuchFileException). Политика доступа и доверия не изменена, чужие игровые исключения не перехватываются.
 
 28 behavioral tests PASS; интеграционные тесты установщика (включая подсказки access-denied/locked-file и предыдущие rollback сценарии) PASS; реальный ZombieBuddy 2.3.4 bridge exposure PASS. Подготовлены неподписанные JAR, ZIP и единый EXE; safe defaults сохранены.
+
+## Первый клиент и PauseEmpty — 0.4.12
+
+Проверен установленный GameServer/ConnectionDetails: writeMods читает GameServer.ServerMods, а OnServerStarted вызывается до обслуживания обычных simulation tick. Старый OnTick-only bootstrap мог зависеть от снятия PauseEmpty. Bootstrap теперь использует OnServerStarted и OnTickEvenPaused; optional-client список повторно проверяется каждые пять секунд с ограниченными сообщениями ошибок. Корневую причину конкретного сообщения пользователя без нового deployment-лога нельзя считать полностью подтверждённой.
+
+Клиентский Lua и переводы перенесены в автоматически устанавливаемый WorkshopSentinelClient, вне server-core checksum paths. Установщик не добавляет helper в server.ini, удаляет его ID, если он был ошибочно указан, сохраняет существующий конфиг и мигрирует пять известных legacy-файлов с резервной копией. Выбор client/server/both и один EXE сохранены.
+
+28 behavioral tests PASS, включая client guard, неизменность loaded списка и повторное исключение повторно добавленного ID. Kahlua tests PASS: client UI/model/MLOS плюс OnServerStarted/OnTickEvenPaused без OnTick. Installer tests PASS: client helper activation, server-only отсутствие helper, удаление и backup старого клиентского Lua, отсутствие client/shared Lua в core, идемпотентность и предыдущие rollback сценарии. Живое подключение клиента без модов остаётся проверкой deployment.
+
+Связанный ServerPanelBridge проверен чтением чата и текущих исходников: на ревизии c3426a3 уже используются OnServerStarted, OnTickEvenPaused, повторное optional exclusion каждые пять секунд и отдельный ServerPanelBridgeMenu. Его рабочие файлы не изменены.

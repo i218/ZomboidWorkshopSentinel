@@ -30,7 +30,7 @@ local statusText = {
     reset = "UI_WorkshopSentinel_CacheclearedNextscancreatesanewbaseline"
 }
 local options = PZAPI.ModOptions:create("WorkshopSentinel", "WorkshopSentinel")
-print("[WorkshopSentinel client] UI loaded v0.4.11; Mod Options registered")
+print("[WorkshopSentinel client] UI loaded v0.4.12; Mod Options registered")
 options:addTickBox("autoPopup", getText("UI_WorkshopSentinel_Showwindowwhenchangesarefound"), true)
 options:addTickBox("changedOnly", getText("UI_WorkshopSentinel_Showchangedmodsonly"), true)
 local function enabled(id) return options:getOption(id):getValue() end

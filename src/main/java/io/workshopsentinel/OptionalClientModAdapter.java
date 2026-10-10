@@ -6,7 +6,7 @@ import java.util.logging.Logger;
 /**
  * Installed B42 ConnectionDetails.writeMods reads GameServer.ServerMods, whereas
  * ZomboidFileSystem.getModIDs() returns a separate, already-loaded runtime list.
- * Call only on the first server OnTick, after loading Lua/Java, never during discovery.
+ * Call after Lua/Java loading at OnServerStarted, then recheck on paused server ticks.
  * Does not alter the .ini, other mods, Workshop download list, or checksums.
  * TODO: confirm a player without this mod can connect on each supported B42 release.
  */
@@ -20,7 +20,7 @@ public final class OptionalClientModAdapter {
         Object advertised = server.getField("ServerMods").get(null);
         Object loaded = fs.getMethod("getModIDs").invoke(instance);
         int removed = exclude(advertised, loaded);
-        log.info("Client optional mode: removed " + removed + " WorkshopSentinel entry/entries from GameServer.ServerMods; server runtime retained");
+        if (removed > 0) log.info("Client optional mode: removed " + removed + " WorkshopSentinel entry/entries from GameServer.ServerMods; server runtime retained");
     }
     static int exclude(Object advertised, Object loaded) {
         if (!(advertised instanceof List<?>) || !(loaded instanceof List<?>) || advertised == loaded)

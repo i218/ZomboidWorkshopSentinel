@@ -7,6 +7,9 @@ public final class Main {
     private static final Logger LOG = Logger.getLogger("WorkshopSentinel");
     private static boolean registered, attempted;
     private static SentinelService service;
+    private static boolean clientOptional, optionalChecked;
+    private static long lastOptionalCheck;
+    private static final FailureReporter OPTIONAL_FAILURES = new FailureReporter(LOG);
     private Main() { }
 
     /** Documented ZombieBuddy lifecycle entry; does not start worker or touch game state. */
@@ -18,7 +21,7 @@ public final class Main {
             // Default exposure retains the canonical global WorkshopSentinelBridge.
             exposer.getMethod("exposeClass", Class.class).invoke(null, WorkshopSentinelBridge.class);
             registered = true;
-            LOG.info("Java bridge registered v0.4.11; awaiting server OnTick. Dedicated-server guard is deferred until tick.");
+            LOG.info("Java bridge registered v0.4.12; awaiting server OnTick. Dedicated-server guard is deferred until tick.");
         } catch (Exception e) {
             LOG.log(Level.SEVERE, "ZombieBuddy Exposer API unavailable; mod disabled. TODO verify deployed ZombieBuddy version", e);
         }
@@ -44,6 +47,7 @@ public final class Main {
                 Path defaultConfig = cache.resolve("WorkshopSentinel").resolve(name).resolve("WorkshopSentinel.properties");
                 Path file = Paths.get(System.getProperty("workshopsentinel.config", defaultConfig.toString()));
                 Config c = Config.load(file, cache.resolve("Server").resolve(name + ".ini"));
+                clientOptional = c.clientOptional;
                 Files.createDirectories(c.directory);
                 try {
                     FileHandler handler = new FileHandler(c.directory.resolve("WorkshopSentinel-%g.log").toString(), 1024 * 1024, 3, true);
@@ -54,7 +58,6 @@ public final class Main {
                     new FailureReporter(LOG).failed("File logging", "Only warnings/errors go to console until JVM restart; monitoring continues", loggingFailure);
                 }
                 PzGameAdapter game = new PzGameAdapter();
-                if (c.clientOptional) OptionalClientModAdapter.apply(LOG);
                 ShutdownAdapter shutdown = () -> LOG.info("Marker-only adapter; supervisor/operator handles restart");
                 if (!c.dryRun && c.shutdownEnabled && c.shutdownAdapter.equals("pz-quit-experimental"))
                     shutdown = new ExperimentalPzShutdownAdapter();
@@ -66,6 +69,12 @@ public final class Main {
                 LOG.info("Started dryRun=" + c.dryRun + " shutdownEnabled=" + c.shutdownEnabled + " provider=" + c.provider
                     + " clientOptional=" + c.clientOptional + " serverIni=" + c.serverIni + " config=" + file.toAbsolutePath());
             } catch (Exception e) { new FailureReporter(LOG).failed("Initialization", "Monitoring disabled; correct configuration/access and restart JVM", e); }
+        }
+        long now = System.nanoTime();
+        if (clientOptional && (!optionalChecked || now - lastOptionalCheck >= 5_000_000_000L)) {
+            optionalChecked = true; lastOptionalCheck = now;
+            try { OptionalClientModAdapter.apply(LOG); OPTIONAL_FAILURES.recovered("Client optional mode"); }
+            catch (Exception failure) { OPTIONAL_FAILURES.failed("Client optional mode", "Retry on unpaused or paused server ticks; loaded runtime remains intact", failure); }
         }
         if (service != null) service.onTick();
     }

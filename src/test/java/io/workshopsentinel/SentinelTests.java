@@ -81,22 +81,33 @@ public final class SentinelTests {
         String oldConfig = System.getProperty("workshopsentinel.config");
         Path directory = Files.createTempDirectory(temp, "bootstrap-");
         Path config = directory.resolve("WorkshopSentinel.properties");
-        Files.writeString(config, "provider=noop\nworkshopIds=3619862853\ndryRun=true\nshutdownEnabled=false\nclientOptional=false\n");
+        Files.writeString(config, "provider=noop\nworkshopIds=3619862853\ndryRun=true\nshutdownEnabled=false\nclientOptional=true\n");
         java.lang.reflect.Field serviceField = Main.class.getDeclaredField("service");
         serviceField.setAccessible(true);
         try {
             System.setProperty("workshopsentinel.cachedir", directory.toString());
             System.setProperty("workshopsentinel.config", config.toString());
+            zombie.network.GameServer.ServerMods.addAll(List.of("OtherMod", "WorkshopSentinel"));
+            zombie.ZomboidFileSystem.instance.loaded.addAll(List.of("OtherMod", "WorkshopSentinel"));
             zombie.network.GameServer.server = false;
             Main.main(new String[0]);
             eq(me.zed_0xff.zombie_buddy.Exposer.exposed, WorkshopSentinelBridge.class);
             eq(me.zed_0xff.zombie_buddy.Exposer.alias, null);
             WorkshopSentinelBridge.onTick();
             eq(serviceField.get(null), null);
+            eq(zombie.network.GameServer.ServerMods, List.of("OtherMod", "WorkshopSentinel"));
             zombie.network.GameServer.server = true;
             WorkshopSentinelBridge.onTick();
             eq(serviceField.get(null) != null, true);
+            eq(zombie.network.GameServer.ServerMods, List.of("OtherMod"));
+            eq(zombie.ZomboidFileSystem.instance.loaded, List.of("OtherMod", "WorkshopSentinel"));
+            zombie.network.GameServer.ServerMods.add("WorkshopSentinel");
+            java.lang.reflect.Field checked = Main.class.getDeclaredField("optionalChecked");
+            checked.setAccessible(true); checked.setBoolean(null, false);
+            WorkshopSentinelBridge.onTick();
+            eq(zombie.network.GameServer.ServerMods, List.of("OtherMod"));
         } finally {
+            zombie.network.GameServer.ServerMods.clear(); zombie.ZomboidFileSystem.instance.loaded.clear();
             Object service = serviceField.get(null);
             if (service != null) ((SentinelService) service).close();
             Logger logger = Logger.getLogger("WorkshopSentinel");

@@ -1,0 +1,6 @@
+name=WorkshopSentinel Client
+id=WorkshopSentinelClient
+description=Optional client update viewer and local server-editor support. Automatically installed by WorkshopSentinel Setup; never enable this component in the server INI.
+modversion=0.4.12
+loadModAfter=\WorkshopSentinel,\ModLoadOrderSorter_b42
+incompatible=\ServerAutoUpdate_B42
