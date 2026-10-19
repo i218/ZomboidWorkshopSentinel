@@ -8,7 +8,7 @@ A mod for **Project Zomboid Build 42 Dedicated Server** with ZombieBuddy install
 
 ## One installer for the client and server
 
-**WorkshopSentinel 0.4.12 uses one installer and one distribution package.** The installer automatically places the server core and optional client support in their own mod folders. This keeps the client UI out of server checksums; players do not need either component to join.
+**WorkshopSentinel 0.4.13 uses one installer and one distribution package.** The installer automatically places the server core and optional client support in their own mod folders. This keeps the client UI out of server checksums; players do not need either component to join.
 
 ### Windows installation
 
@@ -267,3 +267,11 @@ Logging (0.4.11): the mod file records startup, one baseline summary, changed ch
 Initialization runs on OnServerStarted, before ordinary simulation ticks. OnTickEvenPaused keeps checks and optional-client maintenance active with PauseEmpty=true. The advertised list is rechecked every five seconds; retries preserve loaded runtime mods and other client requirements.
 
 The installer automatically deploys and enables WorkshopSentinelClient for client installs. Server-only installs deploy only WorkshopSentinel. Updating removes the five legacy client/translation files from the core, with backups and rollback, so they no longer enter server client/shared checksums. Existing configuration is preserved. Keep clientOptional=true and restart the server after installation. Joining from a real client without either component remains a deployment check.
+
+## Automatic configuration upgrades (0.4.13)
+
+At server startup, the mod adds any missing options from its bundled configuration template. Existing values (including blank ones), comments, custom keys, UTF-8 BOM and line endings are retained. New options and their comments are appended; an up-to-date file is left untouched. An absent file is created automatically.
+
+Before extending an existing file, the mod keeps an exact copy beside it as `WorkshopSentinel.properties.backup-<id>.bak`, then replaces the config atomically. Invalid settings are not rewritten. If saving is blocked by permissions, read-only attributes or file locks, the original stays intact and monitoring uses existing settings plus missing defaults in memory. The log reports the failure; the next server startup retries. Symbolic-link configurations are read but not replaced automatically.
+
+The installer continues to preserve your runtime config. Install the update and start the server: you do not need to delete the config or copy new options yourself. Changes to values still take effect after a server restart; this is not live reloading.

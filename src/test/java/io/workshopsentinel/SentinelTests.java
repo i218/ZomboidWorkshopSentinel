@@ -19,6 +19,8 @@ public final class SentinelTests {
         temp = Files.createTempDirectory("workshop-sentinel-tests-");
         try {
             run("safe defaults and config validation", SentinelTests::config);
+            run("config upgrades preserve edits, append missing defaults and create exact backups", SentinelTests::configUpgrade);
+            run("config upgrade failures preserve files and retain runtime settings", SentinelTests::configUpgradeFailure);
             run("file errors are bounded, actionable and report recovery", SentinelTests::fileFailures);
             run("automatic running server name and explicit override", SentinelTests::serverName);
             run("configured server WorkshopItems and explicit IDs", SentinelTests::items);
@@ -141,6 +143,62 @@ public final class SentinelTests {
         Scenario() throws IOException { this(cfg()); }
         Scenario(Config c) { engine = new SentinelEngine(c, game, (reason, ids, age) -> reasons.add(reason), LOG); }
         void start() { engine.found(IDS, 0); engine.tick(0); }
+    }
+    private static void configUpgrade() throws Exception {
+        Path folder = Files.createTempDirectory(temp, "config-upgrade-");
+        Path file = folder.resolve("WorkshopSentinel.properties"), ini = folder.resolve("server.ini");
+        String old = "\uFEFF# Custom settings \u0442\u0435\u0441\u0442\r\ndryRun=false\r\nshutdownEnabled=false\r\nprovider=noop\r\ncheckIntervalSeconds=617\r\nserverIni=\r\ncustom.plugin=keep\\\r\n  this\r\n";
+        Files.writeString(file, old, StandardCharsets.UTF_8);
+        Config config = Config.load(file, ini);
+        eq(config.dryRun, false); eq(config.checkSeconds, 617L); eq(config.provider, "noop");
+        eq(config.serverIni, ini.toAbsolutePath()); eq(config.clientOptional, true);
+        String updated = Files.readString(file);
+        eq(updated.startsWith(old), true);
+        eq(updated.contains("clientOptional=true\r\n"), true);
+        eq(updated.contains("# Options added by WorkshopSentinel update"), true);
+        Properties parsed = new Properties(); parsed.load(new StringReader(updated.substring(1)));
+        eq(parsed.getProperty("custom.plugin"), "keepthis");
+        eq(parsed.getProperty("serverIni"), "");
+        List<Path> backups;
+        try (java.util.stream.Stream<Path> paths = Files.list(folder)) {
+            backups = paths.filter(p -> p.toString().endsWith(".bak")).collect(java.util.stream.Collectors.toList());
+        }
+        eq(backups.size(), 1); eq(Files.readString(backups.get(0)), old);
+        java.nio.file.attribute.FileTime modified = Files.getLastModifiedTime(file);
+        Config.load(file, ini); eq(Files.readString(file), updated); eq(Files.getLastModifiedTime(file), modified);
+        try (java.util.stream.Stream<Path> paths = Files.list(folder)) { eq(paths.filter(p -> p.toString().endsWith(".bak")).count(), 1L); }
+        Path fresh = folder.resolve("new/config.properties"); Config.load(fresh, ini);
+        eq(Files.readString(fresh), Files.readString(Paths.get("config/WorkshopSentinel.properties")));
+        // Java Properties syntax, including escaped keys and blank values, determines presence.
+        Path syntax = folder.resolve("syntax.properties");
+        Files.writeString(syntax, "# retain\ncheckInterval\\u0053econds: 719\nworkshopIds=\nprovider=noop\n");
+        Config escaped = Config.load(syntax, ini); eq(escaped.checkSeconds, 719L);
+        eq(Files.readString(syntax).contains("checkIntervalSeconds="), false);
+    }
+    private static void configUpgradeFailure() throws Exception {
+        Path folder = Files.createTempDirectory(temp, "config-failure-");
+        Path file = folder.resolve("config.properties"), ini = folder.resolve("server.ini");
+        String invalid = "dryRun=wrong\nprovider=noop\n";
+        Files.writeString(file, invalid); fails(() -> Config.load(file, ini)); eq(Files.readString(file), invalid);
+        try (java.util.stream.Stream<Path> paths = Files.list(folder)) { eq(paths.count(), 1L); }
+        Files.writeString(file, "provider=noop\ncheckIntervalSeconds=419\n");
+        ConfigMigration stale = ConfigMigration.plan(file, "provider=steam\nclientOptional=true\n");
+        Files.writeString(file, "provider=noop\ncheckIntervalSeconds=421\n");
+        fails(() -> stale.persist(LOG)); eq(Files.readString(file), "provider=noop\ncheckIntervalSeconds=421\n");
+        // Windows read-only attributes are a real write-denied path, without manipulating ACLs.
+        if (Files.getFileStore(file).supportsFileAttributeView("dos")) {
+            byte[] before = Files.readAllBytes(file);
+            Files.setAttribute(file, "dos:readonly", true);
+            try {
+                Config readable = Config.load(file, ini); eq(readable.checkSeconds, 421L);
+                eq(Arrays.equals(Files.readAllBytes(file), before), true);
+            } finally {
+                Files.setAttribute(file, "dos:readonly", false);
+                try (java.util.stream.Stream<Path> files = Files.list(folder)) {
+                    for (Path path : (Iterable<Path>) files::iterator) if (Files.isRegularFile(path)) Files.setAttribute(path, "dos:readonly", false);
+                }
+            }
+        }
     }
     private static void config() throws Exception {
         Config c = cfg(); eq(c.dryRun, true); eq(c.shutdownEnabled, false); eq(c.checkSeconds, 300L);

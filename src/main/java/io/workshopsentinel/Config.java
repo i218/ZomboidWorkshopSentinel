@@ -35,11 +35,22 @@ public final class Config {
         explicitIds = ids(p.getProperty("workshopIds", ""));
     }
 
+    private static final java.util.logging.Logger LOG = java.util.logging.Logger.getLogger("WorkshopSentinel");
+    private static final FailureReporter MIGRATION_FAILURES = new FailureReporter(LOG);
     public static Config load(Path file, Path defaultIni) throws IOException {
-        Properties p = new Properties();
-        try (Reader r = Files.newBufferedReader(file, StandardCharsets.UTF_8)) { p.load(r); }
-        catch (NoSuchFileException missing) { /* A genuinely absent config uses documented safe defaults. */ }
-        return new Config(p, file, defaultIni);
+        String template;
+        try (InputStream input = Config.class.getResourceAsStream("/WorkshopSentinel-defaults.properties")) {
+            if (input == null) throw new IOException("Bundled configuration template is missing");
+            template = new String(input.readAllBytes(), StandardCharsets.UTF_8);
+        }
+        ConfigMigration migration = ConfigMigration.plan(file, template);
+        // Validate first: a malformed or unsafe configuration is never rewritten.
+        Config result = new Config(migration.properties, file, defaultIni);
+        try { migration.persist(LOG); MIGRATION_FAILURES.recovered("Configuration update"); }
+        catch (IOException | SecurityException failure) {
+            MIGRATION_FAILURES.failed("Configuration update", "Existing settings retained; missing options use bundled defaults in memory; retry on next startup", failure);
+        }
+        return result;
     }
     private Path path(Properties p, String key, String fallback) {
         String configured = p.getProperty(key, "").trim();
