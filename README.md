@@ -275,3 +275,11 @@ At server startup, the mod adds any missing options from its bundled configurati
 Before extending an existing file, the mod keeps an exact copy beside it as `WorkshopSentinel.properties.backup-<id>.bak`, then replaces the config atomically. Invalid settings are not rewritten. If saving is blocked by permissions, read-only attributes or file locks, the original stays intact and monitoring uses existing settings plus missing defaults in memory. The log reports the failure; the next server startup retries. Symbolic-link configurations are read but not replaced automatically.
 
 The installer continues to preserve your runtime config. Install the update and start the server: you do not need to delete the config or copy new options yourself. Changes to values still take effect after a server restart; this is not live reloading.
+
+## Steam Workshop upload folder
+
+Run `gradlew.bat workshopFolder` to prepare `build/workshop/<version>/WorkshopSentinel/` with `workshop.txt`, `preview.png` and `Contents/mods`. The single item contains WorkshopSentinel (server core) and WorkshopSentinelClient (optional client component), including the built Java JAR, in-game icon and poster. Only runtime files and public documentation are included.
+
+For the in-game uploader, place that folder under `%USERPROFILE%/Zomboid/Workshop/`. This preparation does not publish anything. New packages start with private visibility and no published item ID. Review the description and visibility in the uploader; add ZombieBuddy as a required Workshop item for server use. Installing its Java agent remains a separate server setup step.
+
+Rebuilding an existing package preserves its entire `workshop.txt`, including publication ID and visibility, and archives the previous folder. Never overwrite the `workshop.txt` of a published item with the fresh template. `installer/test-workshop.ps1 -GameDirectory '<game folder>'` runs the installed game's content, metadata and image validators without uploading or starting the game.

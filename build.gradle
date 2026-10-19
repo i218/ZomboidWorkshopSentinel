@@ -76,3 +76,8 @@ tasks.register('modZip', Zip) {
     exclude '**/.gitkeep'
 }
 tasks.named('build') { dependsOn stageMod }
+
+tasks.register('workshopFolder', Exec) {
+    dependsOn stageMod
+    commandLine 'powershell.exe', '-NoProfile', '-File', file('installer/build-workshop.ps1'), '-Refresh'
+}
