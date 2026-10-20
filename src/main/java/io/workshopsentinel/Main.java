@@ -21,7 +21,7 @@ public final class Main {
             // Default exposure retains the canonical global WorkshopSentinelBridge.
             exposer.getMethod("exposeClass", Class.class).invoke(null, WorkshopSentinelBridge.class);
             registered = true;
-            LOG.info("Java bridge registered v0.4.13; awaiting server OnTick. Dedicated-server guard is deferred until tick.");
+            LOG.info("Java bridge registered v0.5.0; awaiting server OnTick. Dedicated-server guard is deferred until tick.");
         } catch (Exception e) {
             LOG.log(Level.SEVERE, "ZombieBuddy Exposer API unavailable; mod disabled. TODO verify deployed ZombieBuddy version", e);
         }
@@ -61,6 +61,8 @@ public final class Main {
                 ShutdownAdapter shutdown = () -> LOG.info("Marker-only adapter; supervisor/operator handles restart");
                 if (!c.dryRun && c.shutdownEnabled && c.shutdownAdapter.equals("pz-quit-experimental"))
                     shutdown = new ExperimentalPzShutdownAdapter();
+                if (!c.dryRun && c.shutdownEnabled && c.shutdownAdapter.equals("serverpanelbridge"))
+                    shutdown = new ServerPanelBridgeAdapter(LOG);
                 WorkshopUpdateProvider provider = c.provider.equals("steam")
                     ? new SteamWorkshopUpdateProvider(c.timeoutSeconds, c.baselineFile, LOG)
                     : c.provider.equals("file") ? StubProviders.file(c.triggerFile) : StubProviders.noop();

@@ -20,7 +20,7 @@ public final class Config {
         provider = p.getProperty("provider", "steam").trim();
         shutdownAdapter = p.getProperty("shutdownAdapter", "marker").trim();
         if (!Set.of("steam", "noop", "file").contains(provider)) throw new IllegalArgumentException("Unknown provider");
-        if (!Set.of("marker", "pz-quit-experimental").contains(shutdownAdapter)) throw new IllegalArgumentException("Unknown shutdownAdapter");
+        if (!Set.of("marker", "pz-quit-experimental", "serverpanelbridge").contains(shutdownAdapter)) throw new IllegalArgumentException("Unknown shutdownAdapter");
         if (!dryRun && shutdownEnabled && provider.equals("file")) throw new IllegalArgumentException("Simulation provider cannot stop a live server");
         checkSeconds = number(p, "checkIntervalSeconds", 300, 1, 86400);
         pollSeconds = number(p, "playerPollSeconds", 60, 1, 86400);

@@ -19,6 +19,9 @@ description=Server Mods: WorkshopSentinel. Keep WorkshopSentinelClient out of th
 description=Optional client Mods: WorkshopSentinelClient. Provides automatic update notifications, local mod version tracking and MLOS support. No client Java agent is required for this component.
 description=With clientOptional=true, the server core is excluded from required client mods. Adding this Workshop item to WorkshopItems can still trigger a Steam download independently of Mods.
 description=
+description=[h2]Optional ServerPanelBridge support[/h2]
+description=Version 0.5.0 adds an optional serverpanelbridge adapter using the Bridge public API. Bridge 0.5.0+ must explicitly allow WorkshopSentinel restart requests. No required dependency, no second helper, and no fallback shutdown on refusal. Standalone marker mode is unchanged.
+description=
 description=[h2]Configuration and restart behavior[/h2]
 description=Configuration is created at Zomboid/WorkshopSentinel/<serverName>/WorkshopSentinel.properties. New options are added automatically on startup without resetting your values.
 description=Defaults: dryRun=true, shutdownEnabled=false, shutdownAdapter=marker. The restart marker is informational; use your external supervisor for relaunch and Workshop downloads.

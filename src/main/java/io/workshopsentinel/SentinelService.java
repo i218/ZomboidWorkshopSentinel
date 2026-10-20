@@ -67,7 +67,7 @@ public final class SentinelService implements AutoCloseable {
             close();
             if (shutdownPending) {
                 shutdownPending = false; // Exactly one request, even if adapter throws after partial success.
-                try { shutdown.requestShutdown(); log.info("Shutdown requested; external supervisor must relaunch and update Workshop"); }
+                try { shutdown.requestShutdown(); log.info(config.shutdownAdapter.equals("serverpanelbridge") ? "Restart delegated to ServerPanelBridge; completion is not confirmed" : "Shutdown requested; external supervisor must relaunch and update Workshop"); }
                 catch (Exception e) { log.log(Level.SEVERE, "Shutdown adapter failed; no automatic retry, operator action required", e); }
             }
         }

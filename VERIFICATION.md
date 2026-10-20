@@ -1,4 +1,4 @@
-# Проверка WorkshopSentinel 0.4.13 — 2026-10-19
+# Проверка WorkshopSentinel 0.5.0 — 2026-10-20
 
 ## Что поставляется
 
@@ -119,3 +119,12 @@ FailureReporter классифицирует AccessDeniedException, SecurityExce
 Проверки PASS: разрешённый состав/пути/размер обложки, отсутствие client/shared Lua в server core, соответствие JAR; штатные SteamWorkshopItem.readWorkshopTxt/validateContents и ChooseGameInfo.readModInfo, регистрация обоих Mod ID, native PNGDecoder для иконок/постеров. Java runner использует установленную игру без инициализации Steam и без загрузки публикации. Тест повторной сборки сохраняет весь workshop.txt с тестовым ID/видимостью/описанием; имя credentials.txt в пакете отклоняется. Предыдущие готовые папки архивируются вне текущего item-folder.
 
 Генератор: installer/build-workshop.ps1, Gradle task workshopFolder. Обложка и иконка созданы собственным кодом; не заимствованы из другого мода. Текущая сборка не публиковалась в Steam.
+
+
+## Optional mod restart integration — 0.5.0 (2026-10-20)
+
+WorkshopSentinel exposes no process launcher and has no required Bridge dependency. Its reflection adapter targets public ModRestartApi v1 and is selected only by explicit shutdownAdapter=serverpanelbridge with live shutdown enabled. Marker/experimental modes retain their previous behavior; missing, disabled, busy or incompatible Bridge causes no fallback shutdown.
+
+Bridge adds a generic requester allowlist (empty by default) and JVM-local public API. It reuses CommandService, its journal, existing RestartAdapter and game-thread shutdown gate. Preparation and result persistence run on the worker. Local requests need no panel/network polling; duplicate IDs are idempotent within this JVM, one local request may be active and the map retains at most 128 results. The allowlist is administrative policy, not authentication of arbitrary code in the JVM.
+
+PASS: 31 Sentinel behavioral tests and installer integration; Bridge 29 control assertions, 18 migration assertions, 18 panel compatibility assertions, 12 base tests and 19 installer assertions, plus new local restart tests. Cross-mod test uses the production Sentinel JAR, real Bridge API and queue, simulated helper/game action; it confirms client rejection and a single accepted delegation. An isolated class loader confirms explicit Bridge absence without hidden dependency or fallback process action. No real server was stopped, restarted, or reconfigured. Live restart through the integration remains a deployment check.

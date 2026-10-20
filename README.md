@@ -8,7 +8,7 @@ A mod for **Project Zomboid Build 42 Dedicated Server** with ZombieBuddy install
 
 ## One installer for the client and server
 
-**WorkshopSentinel 0.4.13 uses one installer and one distribution package.** The installer automatically places the server core and optional client support in their own mod folders. This keeps the client UI out of server checksums; players do not need either component to join.
+**WorkshopSentinel 0.5.0 uses one installer and one distribution package.** The installer automatically places the server core and optional client support in their own mod folders. This keeps the client UI out of server checksums; players do not need either component to join.
 
 ### Windows installation
 
@@ -283,3 +283,26 @@ Run `gradlew.bat workshopFolder` to prepare `build/workshop/<version>/WorkshopSe
 For the in-game uploader, place that folder under `%USERPROFILE%/Zomboid/Workshop/`. This preparation does not publish anything. New packages start with private visibility and no published item ID. Review the description and visibility in the uploader; add ZombieBuddy as a required Workshop item for server use. Installing its Java agent remains a separate server setup step.
 
 Rebuilding an existing package preserves its entire `workshop.txt`, including publication ID and visibility, and archives the previous folder. Never overwrite the `workshop.txt` of a published item with the fresh template. `installer/test-workshop.ps1 -GameDirectory '<game folder>'` runs the installed game's content, metadata and image validators without uploading or starting the game.
+
+## Optional ServerPanelBridge integration (0.5.0)
+
+WorkshopSentinel remains independent: marker mode and experimental graceful shutdown keep their existing behavior. Nothing requires ServerPanelBridge to be installed. To delegate restarts, install ServerPanelBridge 0.5.0+ and configure:
+
+```properties
+# WorkshopSentinel.properties
+dryRun=false
+shutdownEnabled=true
+shutdownAdapter=serverpanelbridge
+```
+
+```properties
+# ServerPanelBridge.properties
+restartEnabled=true
+restartRequesters=WorkshopSentinel
+```
+
+Restart the server after changing configuration. Existing configs are preserved. Bridge's `stopWhenPlayersOnline` policy still applies: leave it false for empty-server restarts only, or explicitly enable it if Bridge should honor Sentinel's completed warning/countdown with players still online. `restartRequesters` is an administrative JVM-local allowlist, not authentication of Java code.
+
+Sentinel persists its informational marker, then sends one request through Bridge API v1. The marker's adapter field identifies delegation; do not also consume it with another restart supervisor. Bridge prepares its existing helper off the game thread, uses its shared shutdown queue and handles stop/relaunch. There is no helper or process-launch implementation in Sentinel. QUEUED/ARMED acknowledges delegation, not a successful new server startup. Final outcomes are in Bridge logs; its public API also exposes status for this JVM session.
+
+Missing/older Bridge, disabled permissions, a busy queue or helper failure produces refusal/failure without a Sentinel fallback shutdown. Dry-run and disabled shutdown never call Bridge. Bridge can accept local requests without panel reporting (`enabled=false`, `commandsEnabled=false`); only its explicit local allowlist and restart permission enable this path. An external supervisor must not launch a second server alongside Bridge's helper. ZombieBuddy approval after Java updates remains a separate pre-load setting.

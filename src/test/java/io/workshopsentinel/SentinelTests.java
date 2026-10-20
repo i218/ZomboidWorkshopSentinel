@@ -19,6 +19,7 @@ public final class SentinelTests {
         temp = Files.createTempDirectory("workshop-sentinel-tests-");
         try {
             run("safe defaults and config validation", SentinelTests::config);
+            run("optional Bridge API delegates or rejects without fallback", SentinelTests::bridgeAdapter);
             run("config upgrades preserve edits, append missing defaults and create exact backups", SentinelTests::configUpgrade);
             run("config upgrade failures preserve files and retain runtime settings", SentinelTests::configUpgradeFailure);
             run("file errors are bounded, actionable and report recovery", SentinelTests::fileFailures);
@@ -143,6 +144,17 @@ public final class SentinelTests {
         Scenario() throws IOException { this(cfg()); }
         Scenario(Config c) { engine = new SentinelEngine(c, game, (reason, ids, age) -> reasons.add(reason), LOG); }
         void start() { engine.found(IDS, 0); engine.tick(0); }
+    }
+    private static void bridgeAdapter() throws Exception {
+        Config c=cfg("shutdownAdapter","serverpanelbridge");eq(c.shutdownAdapter,"serverpanelbridge");
+        io.serverpanelbridge.ModRestartApi.calls=0;
+        ServerPanelBridgeAdapter adapter=new ServerPanelBridgeAdapter(LOG);adapter.requestShutdown();
+        eq(io.serverpanelbridge.ModRestartApi.calls,1);eq(io.serverpanelbridge.ModRestartApi.lastRequester,"WorkshopSentinel");
+        if(!io.serverpanelbridge.ModRestartApi.lastId.matches("[A-Za-z0-9-]+"))throw new AssertionError("Stable opaque request ID required");
+        io.serverpanelbridge.ModRestartApi.answer="REJECTED_DISABLED";
+        fails(adapter::requestShutdown);
+        io.serverpanelbridge.ModRestartApi.version=2;fails(adapter::requestShutdown);
+        io.serverpanelbridge.ModRestartApi.version=1;io.serverpanelbridge.ModRestartApi.answer="QUEUED";
     }
     private static void configUpgrade() throws Exception {
         Path folder = Files.createTempDirectory(temp, "config-upgrade-");
