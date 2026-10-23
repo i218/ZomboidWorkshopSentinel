@@ -30,7 +30,7 @@ local statusText = {
     reset = "UI_WorkshopSentinel_CacheclearedNextscancreatesanewbaseline"
 }
 local options = PZAPI.ModOptions:create("WorkshopSentinel", "WorkshopSentinel")
-print("[WorkshopSentinel client] UI loaded v0.5.0; Mod Options registered")
+print("[WorkshopSentinel client] UI loaded v0.5.1; Mod Options registered")
 options:addTickBox("autoPopup", getText("UI_WorkshopSentinel_Showwindowwhenchangesarefound"), true)
 options:addTickBox("changedOnly", getText("UI_WorkshopSentinel_Showchangedmodsonly"), true)
 local function enabled(id) return options:getOption(id):getValue() end
@@ -138,6 +138,42 @@ local function notifyChanges()
     end
 end
 table.insert(C.listeners, notifyChanges)
+-- Other mods add menu controls after OnMainMenuEnter, and may move them on resize.
+-- Re-evaluate our own position before drawing; never reposition another mod's UI.
+local function placeMenuButton(main)
+    local button = main.workshopSentinelButton
+    if main.inGame or not main.bottomPanel or not main.bottomPanel:getIsVisible() then
+        button:setVisible(false)
+        return
+    end
+    local gap = 8
+    local width = math.min(math.max(260, getTextManager():MeasureStringX(UIFont.Small, button.title) + 24), main.width - 32)
+    local height = math.max(32, getTextManager():getFontHeight(UIFont.Small) + 12)
+    local x, y = main.width - width - 16, 28
+    local obstacles = {}
+    for _, child in pairs(main:getChildren()) do
+        if child ~= button and child:getIsVisible() then
+            table.insert(obstacles, {x=child:getX(), y=child:getY(), w=child:getWidth(), h=child:getHeight()})
+        end
+    end
+    -- Each collision advances past an obstacle, so the search is bounded.
+    for attempt = 1, #obstacles + 1 do
+        local nextY = y
+        for _, rect in ipairs(obstacles) do
+            if x < rect.x + rect.w + gap and x + width + gap > rect.x
+                and y < rect.y + rect.h + gap and y + height + gap > rect.y then
+                nextY = math.max(nextY, rect.y + rect.h + gap)
+            end
+        end
+        if nextY == y then break end
+        y = nextY
+    end
+    -- Keep automatic notifications and the Mod Options entry available even if
+    -- a crowded/small menu has no safe room for this optional shortcut.
+    button:setVisible(width > 0 and y + height <= main.height - 16)
+    button:setWidth(width); button:setHeight(height)
+    button:setX(x); button:setY(y)
+end
 local function menu()
     local main = MainScreen and MainScreen.instance
     if not main or main.inGame then
@@ -145,12 +181,12 @@ local function menu()
         return
     end
     if not main.workshopSentinelButton then
-        local b = ISButton:new(main.width - 282, 35, 260, 32, getText("UI_WorkshopSentinel_Modupdates"), C, function() C.open() end)
-        b:initialise(); b:setAnchorLeft(false); b:setAnchorRight(true); main:addChild(b)
+        local b = ISButton:new(0, 0, 260, 32, getText("UI_WorkshopSentinel_Modupdates"), C, function() C.open() end)
+        b:initialise(); main:addChild(b)
         main.workshopSentinelButton = b
         print("[WorkshopSentinel client] Main-menu updates button created")
     end
-    main.workshopSentinelButton:setVisible(true)
+    placeMenuButton(main)
     C.enableAutomaticChecks()
 end
 Events.OnMainMenuEnter.Add(menu)
@@ -158,7 +194,7 @@ Events.OnPreUIDraw.Add(function()
     notifyChanges()
     local main = MainScreen and MainScreen.instance
     if main and main.workshopSentinelButton then
-        main.workshopSentinelButton:setVisible(not main.inGame and main.bottomPanel and main.bottomPanel:getIsVisible() or false)
+        placeMenuButton(main)
     end
 end)
 Events.OnGameStart.Add(function()

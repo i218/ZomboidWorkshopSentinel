@@ -33,6 +33,20 @@ function Widget:setAnchorLeft(value) end
 function Widget:setAnchorRight(value) end
 function Widget:setVisible(value) self.visible=value end
 function Widget:setEnable(value) self.enabled=value end
+function Widget:getChildren() return self.children end
+function Widget:getIsVisible() return self.visible ~= false end
+function Widget:getX() return self.x end
+function Widget:getY() return self.y end
+function Widget:getWidth() return self.width end
+function Widget:getHeight() return self.height end
+function Widget:setX(value) self.x=value end
+function Widget:setY(value) self.y=value end
+function Widget:setWidth(value) self.width=value end
+function Widget:setHeight(value) self.height=value end
+function getTextManager() return {
+    MeasureStringX=function(self,font,text) return #text * 4 end,
+    getFontHeight=function(self,font) return 16 end
+} end
 ISPanel=Widget:derive("ISPanel"); ISButton=Widget:derive("ISButton")
 ISScrollingListBox=Widget:derive("ISScrollingListBox"); ISRichTextPanel=Widget:derive("ISRichTextPanel")
 PZAPI={ModOptions={}}

@@ -36,6 +36,31 @@ C.window:close(); testLanguage="RU"
 local count=#MainScreen.instance.children
 for _,fn in ipairs(testEvents.menus) do fn() end
 assert(#MainScreen.instance.children==count,"No duplicate menu button")
+local main=MainScreen.instance
+local shortcut=main.workshopSentinelButton
+local optimiser=ISButton:new(main.width-282,28,216,32,"Optimiser")
+local engine=ISButton:new(main.width-282,66,216,32,"Engine")
+main:addChild(optimiser); main:addChild(engine)
+for _,fn in ipairs(testEvents.ticks) do fn() end
+assert(shortcut.y>=106 and shortcut.visible,"Avoid late-added overlapping mod buttons with spacing")
+assert(optimiser.y==28 and engine.y==66,"Never move another mod's controls")
+local stableY=shortcut.y
+for _,fn in ipairs(testEvents.ticks) do fn() end
+assert(shortcut.y==stableY,"Placement remains stable across frames")
+engine:setVisible(false)
+for _,fn in ipairs(testEvents.ticks) do fn() end
+assert(shortcut.y==68,"Hidden controls do not reserve space")
+main.width=800; main.height=100
+optimiser:setX(518); optimiser:setHeight(100)
+for _,fn in ipairs(testEvents.ticks) do fn() end
+assert(not shortcut.visible,"No overlapping/offscreen shortcut when there is no space")
+main.width=1000; main.height=720
+optimiser:setX(718); optimiser:setHeight(32)
+for _,fn in ipairs(testEvents.ticks) do fn() end
+assert(shortcut.visible and shortcut.x+shortcut.width==984,"Reflow and restore after resize")
+optimiser:setVisible(false); main.width=1280
+for _,fn in ipairs(testEvents.ticks) do fn() end
+assert(shortcut.y==28,"Reclaim space when other controls disappear")
 MainScreen.instance.bottomPanel.visible=false
 for _,fn in ipairs(testEvents.ticks) do fn() end
 assert(not MainScreen.instance.workshopSentinelButton.visible,"Hide on another menu screen")

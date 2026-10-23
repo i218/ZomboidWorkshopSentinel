@@ -10,8 +10,8 @@ using System.Text.RegularExpressions;
 using System.Security.Cryptography;
 
 [assembly: AssemblyTitle("WorkshopSentinel Setup")]
-[assembly: AssemblyVersion("0.5.0.0")]
-[assembly: AssemblyFileVersion("0.5.0.0")]
+[assembly: AssemblyVersion("0.5.1.0")]
+[assembly: AssemblyFileVersion("0.5.1.0")]
 
 class Setup {
     static string DefaultDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Zomboid");
@@ -310,7 +310,7 @@ class Setup {
         TextBox dataDir=new TextBox(); ComboBox name=new ComboBox();
         CheckBox client=new CheckBox(),server=new CheckBox();
         public SetupForm() {
-            Text="WorkshopSentinel — установщик 0.5.0"; ClientSize=new Size(660,390);
+            Text="WorkshopSentinel — установщик 0.5.1"; ClientSize=new Size(660,390);
             FormBorderStyle=FormBorderStyle.FixedDialog; MaximizeBox=false; StartPosition=FormStartPosition.CenterScreen;
             AddLabel("Один мод для клиента и dedicated server. Выберите папку данных Zomboid.",18,18,620);
             FolderRow(dataDir,DefaultDir,58);

@@ -234,6 +234,6 @@ function C.changelog(row)
     return table.concat(parts, "\n\n")
 end
 C.loadCache()
-print("[WorkshopSentinel client] Model loaded v0.5.0; client updates do not use the Java bridge")
+print("[WorkshopSentinel client] Model loaded v0.5.1; client updates do not use the Java bridge")
 -- UI frames run in the main menu too; OnTick is not reliable before entering a world.
 Events.OnPreUIDraw.Add(C.tick)

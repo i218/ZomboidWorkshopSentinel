@@ -8,7 +8,7 @@ A mod for **Project Zomboid Build 42 Dedicated Server** with ZombieBuddy install
 
 ## One installer for the client and server
 
-**WorkshopSentinel 0.5.0 uses one installer and one distribution package.** The installer automatically places the server core and optional client support in their own mod folders. This keeps the client UI out of server checksums; players do not need either component to join.
+**WorkshopSentinel 0.5.1 uses one installer and one distribution package.** The installer automatically places the server core and optional client support in their own mod folders. This keeps the client UI out of server checksums; players do not need either component to join.
 
 ### Windows installation
 
@@ -51,6 +51,8 @@ For MLOS support, enable WorkshopSentinel in the main Mods menu; the client inst
 The package is ready for local installation. It has not been published to Steam Workshop.
 
 ## Client update checking
+
+In 0.5.1, the main-menu shortcut finds a free position below visible controls from other mods, with an 8-pixel gap. It adjusts when the menu changes or the window is resized. If there is no room, the shortcut hides; automatic notifications and the Mod Options entry remain available.
 
 Checks run automatically on entering the main menu and then every **20 minutes**. New changes open a compact window with a mod list and details. There is no Check button. Dismissing a notification prevents the same changes from opening it again.
 
