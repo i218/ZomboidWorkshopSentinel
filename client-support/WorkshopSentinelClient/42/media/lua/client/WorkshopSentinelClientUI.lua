@@ -30,8 +30,9 @@ local statusText = {
     reset = "UI_WorkshopSentinel_CacheclearedNextscancreatesanewbaseline"
 }
 local options = PZAPI.ModOptions:create("WorkshopSentinel", "WorkshopSentinel")
-print("[WorkshopSentinel client] UI loaded v0.5.1; Mod Options registered")
+print("[WorkshopSentinel client] UI loaded v0.5.2; Mod Options registered")
 options:addTickBox("autoPopup", getText("UI_WorkshopSentinel_Showwindowwhenchangesarefound"), true)
+options:addTickBox("openOnMenuEnter", getText("UI_WorkshopSentinel_OpenOnMenuEnter"), true)
 options:addTickBox("changedOnly", getText("UI_WorkshopSentinel_Showchangedmodsonly"), true)
 local function enabled(id) return options:getOption(id):getValue() end
 local Window = ISPanel:derive("WorkshopSentinelWindow")
@@ -72,8 +73,14 @@ function Window:initialise()
     self:refresh()
 end
 function Window:close()
+    self.moving = false
+    self:setVisible(false)
+    self:setAlwaysOnTop(false)
     self:removeFromUIManager()
     if C.window == self then C.window = nil end
+end
+function Window:onMouseDownOutside(x, y)
+    self:close()
 end
 function Window:prerender()
     ISPanel.prerender(self)
@@ -114,7 +121,8 @@ function C.open(testRows)
     local width = math.min(760, getCore():getScreenWidth() - 30)
     local height = math.min(460, getCore():getScreenHeight() - 30)
     local w = Window:new((getCore():getScreenWidth() - width) / 2, (getCore():getScreenHeight() - height) / 2, width, height)
-    w.testRows = testRows; w:initialise(); w:addToUIManager(); C.window = w
+    w.testRows = testRows; w:initialise(); w:addToUIManager()
+    w:setAlwaysOnTop(true); w:bringToTop(); C.window = w
 end
 options.apply = function() if C.window then C.window:refresh() end end
 table.insert(C.listeners, function()
@@ -188,11 +196,15 @@ local function menu()
     end
     placeMenuButton(main)
     C.enableAutomaticChecks()
+    if enabled("openOnMenuEnter") and not C.window then C.open() end
 end
 Events.OnMainMenuEnter.Add(menu)
 Events.OnPreUIDraw.Add(function()
     notifyChanges()
     local main = MainScreen and MainScreen.instance
+    if C.window and (not main or main.inGame or not main.bottomPanel or not main.bottomPanel:getIsVisible()) then
+        C.window:close()
+    end
     if main and main.workshopSentinelButton then
         placeMenuButton(main)
     end

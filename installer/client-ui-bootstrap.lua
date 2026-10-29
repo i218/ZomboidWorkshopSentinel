@@ -33,6 +33,8 @@ function Widget:setAnchorLeft(value) end
 function Widget:setAnchorRight(value) end
 function Widget:setVisible(value) self.visible=value end
 function Widget:setEnable(value) self.enabled=value end
+function Widget:setAlwaysOnTop(value) self.alwaysOnTop=value end
+function Widget:bringToTop() self.raised=true end
 function Widget:getChildren() return self.children end
 function Widget:getIsVisible() return self.visible ~= false end
 function Widget:getX() return self.x end

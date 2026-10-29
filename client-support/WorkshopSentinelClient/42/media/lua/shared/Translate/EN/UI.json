@@ -1,4 +1,5 @@
 {
+  "UI_WorkshopSentinel_OpenOnMenuEnter": "Open window on entering the main menu",
   "UI_WorkshopSentinel_Showwindowwhenchangesarefound": "Show window when changes are found",
   "UI_WorkshopSentinel_Showchangedmodsonly": "Show changed mods only",
   "UI_WorkshopSentinel_Updateavailable": "Update available",

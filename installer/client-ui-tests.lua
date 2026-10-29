@@ -1,9 +1,11 @@
 local C=WorkshopSentinelClient
 assert(testOptions.dict.autoPopup.value, "Automatic popup by default")
+assert(testOptions.dict.openOnMenuEnter.value,"Open on menu entry by default")
 assert(not testOptions.dict.scan and not testOptions.dict.autoScan,"No manual scan or opt-in scheduling")
 local testRows={{id="10",title="<IMAGE:untrusted>",version="A=2",state="NeedsUpdate",available=true,updated=2,mods={},testChangelog="<IMAGE:bad>\nA change"}}
 C.open(testRows)
 assert(C.window and C.window.added and #C.window.list.items==1,"Create update window")
+assert(C.window.alwaysOnTop and C.window.raised,"Window stays above the full-screen main menu")
 assert(not C.window.details.text:match("<IMAGE"),"Render changelog as plain text")
 for _,button in ipairs(C.window.children) do
     if button.title==expectedRussianCopy then button.onclick(button.target) end
@@ -11,6 +13,14 @@ for _,button in ipairs(C.window.children) do
 end
 assert(testClipboard=="https://steamcommunity.com/sharedfiles/filedetails/?id=10" and testOverlay=="10","Link actions")
 C.window:close(); assert(C.window==nil,"Close window")
+local oldWindow
+C.open(testRows); oldWindow=C.window
+oldWindow.moving=true; oldWindow:onMouseDownOutside(-10,-10)
+assert(C.window==nil and not oldWindow.added and not oldWindow.visible and not oldWindow.moving,
+    "Outside click fully removes the window, without leaving a ghost or a drag")
+C.open(testRows); oldWindow:close()
+assert(C.window and C.window~=oldWindow,"A stale window cannot clear a newly opened one")
+C.window:close()
 C.rows=testRows; C.status="cache-error"; C.changedCount=1; C.notify()
 assert(C.window~=nil,"Changed results still open when cache save fails")
 C.window:close()
@@ -24,6 +34,21 @@ for _,fn in ipairs(testEvents.ticks) do fn() end
 assert(C.window~=nil,"Deferred update opens automatically on return to menu")
 C.window:close()
 for _,fn in ipairs(testEvents.menus) do fn() end
+assert(C.window and C.window.added,"Menu entry opens results even without a new update")
+C.window:close()
+for _,fn in ipairs(testEvents.ticks) do fn() end
+assert(not C.window,"Dismissed entry window is not reopened every frame")
+testOptions.dict.openOnMenuEnter.value=false
+for _,fn in ipairs(testEvents.menus) do fn() end
+assert(not C.window,"Disabled entry option keeps the window closed")
+C.rows[1].updated=5; C.notify()
+assert(C.window,"Update notifications remain independent of entry option")
+C.window:close()
+testOptions.dict.autoPopup.value=false
+testOptions.dict.openOnMenuEnter.value=true
+for _,fn in ipairs(testEvents.menus) do fn() end
+assert(C.window,"Entry option remains independent of update notifications")
+C.window:close(); testOptions.dict.autoPopup.value=true
 assert(MainScreen.instance.workshopSentinelButton and MainScreen.instance.workshopSentinelButton.visible,"Main-menu button")
 assert(MainScreen.instance.workshopSentinelButton.title==expectedRussianMenu,"Russian text survives independently checked Unicode")
 C.open(); C.window:prerender()
@@ -62,7 +87,9 @@ optimiser:setVisible(false); main.width=1280
 for _,fn in ipairs(testEvents.ticks) do fn() end
 assert(shortcut.y==28,"Reclaim space when other controls disappear")
 MainScreen.instance.bottomPanel.visible=false
+C.open(); oldWindow=C.window
 for _,fn in ipairs(testEvents.ticks) do fn() end
+assert(not C.window and not oldWindow.added,"Leaving the main menu removes its floating window")
 assert(not MainScreen.instance.workshopSentinelButton.visible,"Hide on another menu screen")
 MainScreen.instance.bottomPanel.visible=true
 for _,fn in ipairs(testEvents.ticks) do fn() end

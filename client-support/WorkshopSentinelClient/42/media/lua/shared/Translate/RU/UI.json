@@ -1,4 +1,5 @@
 {
+  "UI_WorkshopSentinel_OpenOnMenuEnter": "Открывать меню при входе",
   "UI_WorkshopSentinel_Showwindowwhenchangesarefound": "Показывать окно при обнаружении изменений",
   "UI_WorkshopSentinel_Showchangedmodsonly": "Показывать только изменившиеся моды",
   "UI_WorkshopSentinel_Updateavailable": "Доступно обновление",
