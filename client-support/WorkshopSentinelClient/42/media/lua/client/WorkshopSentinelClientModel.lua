@@ -188,23 +188,53 @@ function C.tick()
     C.pending = request
     local ok, err = pcall(querySteamWorkshopItemDetails, ids, function(context, status, details)
         if context ~= C.pending or context.generation ~= C.generation then return end
-        if status ~= "Completed" then C.fail("steam-error"); return end
+        local function reject(reason)
+            C.reportFailure("Steam response", reason .. "; previous results and cache retained")
+            C.fail("steam-error")
+        end
+        if status ~= "Completed" then reject("status=" .. clean(status):sub(1, 80)); return end
         local parsed, seen = {}, {}
-        local valid, parseError = pcall(function()
+        local currentId, currentIndex = "unknown", -1
+        local function issue(reason, id, stamp)
+            local row = context.expected[id]
+            return reason .. "; id=" .. clean(id):sub(1, 40)
+                .. "; updated=" .. clean(stamp):sub(1, 40)
+                .. "; mods=" .. clean(row and table.concat(row.mods, ",") or "not requested"):sub(1, 160)
+        end
+        -- Invalid Steam records are expected failures, not Lua exceptions. Kahlua
+        -- prints a stack trace even when error() is caught by pcall.
+        local valid, problem = pcall(function()
+            if not details then return "missing detail list" end
             for i = 0, details:size() - 1 do
+                currentIndex = i
                 local detail = details:get(i)
-                local id, stamp = tostring(detail:getIDString()), tonumber(detail:getTimeUpdated())
-                if not context.expected[id] or seen[id] or not stamp or stamp <= 0 then error("Unexpected Steam response") end
+                if not detail then return "missing record; index=" .. i end
+                local id, rawStamp = tostring(detail:getIDString()), detail:getTimeUpdated()
+                currentId = id
+                local stamp = tonumber(rawStamp)
+                if not context.expected[id] then return issue("unexpected Workshop ID", id, rawStamp) end
+                if seen[id] then return issue("duplicate Workshop ID", id, rawStamp) end
+                if not stamp or stamp ~= stamp or stamp <= 0 or stamp == math.huge or stamp ~= math.floor(stamp) then
+                    return issue("invalid update timestamp", id, rawStamp)
+                end
                 seen[id] = true
                 parsed[id] = { updated = stamp, state = detail:getState(), title = clean(detail:getTitle()) }
             end
-            for id in pairs(context.expected) do if not seen[id] then error("Incomplete Steam response") end end
+            for id in pairs(context.expected) do
+                if not seen[id] then return issue("missing requested item", id, "unavailable") end
+            end
         end)
-        if not valid then print("[WorkshopSentinel client] " .. tostring(parseError)); C.fail("steam-error"); return end
+        if not valid then
+            reject("unreadable record; index=" .. currentIndex .. "; id=" .. clean(currentId):sub(1, 40)
+                .. "; " .. clean(problem):sub(1, 160))
+            return
+        end
+        if problem then reject(problem); return end
         for id, data in pairs(parsed) do
             local row = context.expected[id]
             row.updated, row.state, row.workshopTitle = data.updated, data.state, data.title
         end
+        if context.last == #C.scanRows then C.reportRecovery("Steam response") end
         C.pending, C.cursor, C.nextAt = nil, context.last + 1, now() + 4000
     end, request)
     if not ok then print("[WorkshopSentinel client] " .. tostring(err)); C.fail("api-error") end
@@ -234,6 +264,6 @@ function C.changelog(row)
     return table.concat(parts, "\n\n")
 end
 C.loadCache()
-print("[WorkshopSentinel client] Model loaded v0.5.2; client updates do not use the Java bridge")
+print("[WorkshopSentinel client] Model loaded v0.5.3; client updates do not use the Java bridge")
 -- UI frames run in the main menu too; OnTick is not reliable before entering a world.
 Events.OnPreUIDraw.Add(C.tick)

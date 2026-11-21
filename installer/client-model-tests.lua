@@ -31,6 +31,44 @@ local goodCache = testFiles[C.cacheFile]
 testTime = testTime + 60000; C.start(); C.tick(); request = testRequests[#testRequests]
 request.callback(request.context, "Completed", list({}))
 assert(C.status == "steam-error" and testFiles[C.cacheFile] == goodCache, "Partial result cannot commit cache")
+
+-- Bad records must not raise error(): Kahlua logs caught exceptions as stacks.
+local previousRows, previousBaseline = C.rows, C.baseline
+local originalError, validationThrows = error, 0
+local function badResponse(results, expectedReason, expectedId)
+    testTime=testTime+60000; assert(C.start()); C.tick()
+    local pendingRequest=testRequests[#testRequests]
+    error=function(message) validationThrows=validationThrows+1; return originalError(message) end
+    pendingRequest.callback(pendingRequest.context,"Completed",results)
+    error=originalError
+    assert(C.status=="steam-error" and not C.busy,"Reject invalid Steam batch")
+    assert(C.rows==previousRows and C.baseline==previousBaseline and testFiles[C.cacheFile]==goodCache,
+        "Bad response preserves published results, baseline and disk cache")
+    local message=C.failures["Steam response"].message
+    assert(message:match(expectedReason) and message:match("id="..expectedId),"Diagnostic identifies reason and item")
+    return message
+end
+assert(badResponse(list({detail("10",0)}),"invalid update timestamp","10"):match("mods=A,B"),
+    "Diagnostic identifies installed mods associated with the Workshop item")
+local messages=#testMessages
+badResponse(list({detail("10",0)}),"invalid update timestamp","10")
+assert(#testMessages==messages,"Repeated identical Steam failure is bounded")
+badResponse(list({detail("10",-1)}),"invalid update timestamp","10")
+badResponse(list({detail("10","invalid")}),"invalid update timestamp","10")
+badResponse(list({detail("10",math.huge)}),"invalid update timestamp","10")
+badResponse(list({detail("10",100.5)}),"invalid update timestamp","10")
+badResponse(list({detail("999",100)}),"unexpected Workshop ID","999")
+badResponse(list({detail("10",100),detail("10",100)}),"duplicate Workshop ID","10")
+badResponse(list({}),"missing requested item","10")
+assert(validationThrows==0,"Invalid responses never throw a Lua exception")
+testTime=testTime+60000; assert(C.start()); C.tick(); request=testRequests[#testRequests]
+request.callback(request.context,"Completed",nil)
+assert(C.status=="steam-error" and C.failures["Steam response"].message:match("missing detail list"),
+    "Nil response is handled without a native method call")
+testTime=testTime+60000; assert(C.start()); C.tick(); request=testRequests[#testRequests]
+request.callback(request.context,"Completed",list({detail("10",200)}))
+testTime=testTime+4000; C.tick()
+assert(C.status=="complete" and not C.failures["Steam response"],"Successful retry reports recovery")
 testTime = testTime + 60000; C.start(); C.tick(); request = testRequests[#testRequests]
 testTime = testTime + 30001; C.tick()
 assert(C.status == "timeout" and not C.busy, "Timeout")
@@ -57,6 +95,14 @@ assert(request.ids:size() == 1)
 request.callback(request.context, "Completed", list({detail(request.ids:get(0), 300)}))
 testTime = testTime + 4000; C.tick()
 assert(C.status == "complete" and #C.rows == 201, "All batches complete")
+local completeRows, completeCache, completeBaseline=C.rows,testFiles[C.cacheFile],C.baseline
+testTime=testTime+60000; assert(C.start()); C.tick(); request=testRequests[#testRequests]
+results={}; for _,id in ipairs(request.ids.values) do table.insert(results,detail(id,400)) end
+request.callback(request.context,"Completed",list(results))
+testTime=testTime+4000; C.tick(); request=testRequests[#testRequests]
+request.callback(request.context,"Completed",list({detail(request.ids:get(0),0)}))
+assert(C.status=="steam-error" and C.rows==completeRows and C.baseline==completeBaseline
+    and testFiles[C.cacheFile]==completeCache,"Second-batch failure cannot publish first-batch partial changes")
 assert(C.resetCache() and testFiles[C.cacheFile] == "", "Cache reset")
 assert(C.saveCache({["10"]={updated=1790000000,version="A=2"}})); C.loadCache()
 assert(C.baseline["10"].updated == 1790000000, "Unix timestamp cache roundtrip")

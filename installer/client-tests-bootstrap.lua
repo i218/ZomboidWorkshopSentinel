@@ -1,6 +1,7 @@
 ipairs, pairs = table.ipairs, table.pairs
 -- Use the runtime assert so failures retain their message.
-function print(...) end
+testMessages = {}
+function print(message) table.insert(testMessages, tostring(message)) end
 function isServer() return false end
 testTime, testSteam = 100000, true
 function getTimestampMs() return testTime end

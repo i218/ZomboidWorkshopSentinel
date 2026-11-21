@@ -52,6 +52,8 @@ The package is ready for local installation. It has not been published to Steam 
 
 ## Client update checking
 
+**0.5.3:** Invalid Steam records produce a short diagnostic with the reason, Workshop ID, update timestamp and associated installed mod IDs when available. Repeated identical failures are throttled. A rejected batch cancels the current scan and retains previous results and cache; it does not publish partial updates. The next automatic scan retries normally.
+
 **0.5.2:** Mod Options → WorkshopSentinel → **Open window on entering the main menu** is enabled by default. It opens existing results at each main-menu entry, independently of update notifications and without an extra Steam request. Closing it keeps it closed until the next menu entry or a new update notification. Clicking outside fully closes the window; navigating to another game screen also removes it.
 
 In 0.5.1, the main-menu shortcut finds a free position below visible controls from other mods, with an 8-pixel gap. It adjusts when the menu changes or the window is resized. If there is no room, the shortcut hides; automatic notifications and the Mod Options entry remain available.
