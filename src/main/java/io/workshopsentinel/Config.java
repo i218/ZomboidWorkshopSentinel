@@ -11,6 +11,7 @@ public final class Config {
     public final long checkSeconds, pollSeconds, waitSeconds, countdownSeconds, tickMillis, timeoutSeconds;
     public final Path directory, serverIni, triggerFile, markerFile, baselineFile;
     public final Set<String> explicitIds;
+    public final StagingSettings staging;
 
     public Config(Properties p, Path file, Path defaultIni) {
         directory = file.toAbsolutePath().normalize().getParent();
@@ -33,6 +34,8 @@ public final class Config {
         markerFile = path(p, "markerFile", "restart-marker.properties");
         baselineFile = p.getProperty("installedBaselineFile", "").trim().isEmpty() ? null : path(p, "installedBaselineFile", "");
         explicitIds = ids(p.getProperty("workshopIds", ""));
+        staging = new StagingSettings(p, directory);
+        if(staging.enabled && !provider.equals("steam"))throw new IllegalArgumentException("Staging requires the public Steam provider");
     }
 
     private static final java.util.logging.Logger LOG = java.util.logging.Logger.getLogger("WorkshopSentinel");

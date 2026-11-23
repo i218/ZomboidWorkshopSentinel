@@ -1,7 +1,7 @@
 plugins { id 'java' }
 
 group = 'io.workshopsentinel'
-version = '0.5.3'
+version = '0.6.0'
 def localSigning = new Properties()
 def signingFile = file('signing.local.properties')
 if (signingFile.exists()) signingFile.withInputStream { localSigning.load(it) }
@@ -40,6 +40,12 @@ tasks.register('selfTest', JavaExec) {
     mainClass = 'io.workshopsentinel.SentinelTests'
 }
 tasks.named('check') { dependsOn selfTest }
+tasks.register('stagingTest', JavaExec) {
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'io.workshopsentinel.StagingTests'
+}
+tasks.named('check') { dependsOn stagingTest }
 tasks.register('steamProbe', JavaExec) {
     dependsOn testClasses
     classpath = sourceSets.test.runtimeClasspath
@@ -70,6 +76,7 @@ tasks.register('modZip', Zip) {
         into('common') { from('common') }
         into('config') { from('config') }
         into('docs') { from('docs') }
+        into('tools') { from('tools') }
         into('client-support') { from('client-support') }
         from('README.md', 'README.ru.md', 'VERIFICATION.md')
     }

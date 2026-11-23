@@ -38,4 +38,4 @@ description=Монитор обновлений Workshop для dedicated server
 description=На сервере включайте WorkshopSentinel. WorkshopSentinelClient — необязательный клиентский компонент, на сервере его включать не нужно. Клиентская часть проверяет обновления автоматически и поддерживает локальные моды и MLOS.
 description=По умолчанию включён dry-run: остановки нет. Конфиг создаётся и дополняется автоматически с сохранением настроек. Маркер перезапуска требует внешнего супервизора; experimental shutdown только завершает сервер, но не запускает его заново.
 tags=Build 42;Multiplayer;Interface;Misc;QoL
-visibility=private
+visibility=public

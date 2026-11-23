@@ -50,6 +50,10 @@ For MLOS support, enable WorkshopSentinel in the main Mods menu; the client inst
 
 The package is ready for local installation. It has not been published to Steam Workshop.
 
+## Optional isolated Workshop downloads (0.6.0)
+
+Staging is disabled by default. When explicitly enabled, a dedicated SteamCMD downloads into a separate directory. A required pre-start check validates Steam timestamps, manifest IDs and SHA-256 receipts before replacing server content and ACF entries, with rollback/recovery. It never launches the server. See [setup and guarantees](docs/STAGING.md); a startup-script change and a separate SteamCMD installation are required.
+
 ## Client update checking
 
 **0.5.3:** Invalid Steam records produce a short diagnostic with the reason, Workshop ID, update timestamp and associated installed mod IDs when available. Repeated identical failures are throttled. A rejected batch cancels the current scan and retains previous results and cache; it does not publish partial updates. The next automatic scan retries normally.

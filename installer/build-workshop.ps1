@@ -38,6 +38,13 @@ Copy-Runtime (Join-Path $root 'client-support/WorkshopSentinelClient') $client
 New-Item -ItemType Directory -Path (Join-Path $core 'config') -Force|Out-Null
 Copy-Item -LiteralPath (Join-Path $root 'config/WorkshopSentinel.properties') -Destination (Join-Path $core 'config/WorkshopSentinel.properties')
 foreach($readme in @('README.md','README.ru.md')){Copy-Item -LiteralPath (Join-Path $root $readme) -Destination (Join-Path $core $readme)}
+New-Item -ItemType Directory -Path (Join-Path $core 'docs') -Force|Out-Null
+foreach($guide in @('STAGING.md','STAGING.ru.md')){Copy-Item -LiteralPath (Join-Path $root "docs/$guide") -Destination (Join-Path $core "docs/$guide")}
+New-Item -ItemType Directory -Path (Join-Path $core 'tools') -Force|Out-Null
+foreach($tool in @('BeforeServerStart.ps1','before-server-start.sh')){
+    $uploadName=if($tool.EndsWith('.sh')){$tool+'.txt'}else{$tool}
+    Copy-Item -LiteralPath (Join-Path $root "tools/$tool") -Destination (Join-Path $core "tools/$uploadName")
+}
 foreach($mod in @($core,$client)){
     New-Item -ItemType Directory -Path (Join-Path $mod 'common') -Force|Out-Null
     Copy-Item -LiteralPath (Join-Path $root 'workshop/icon.png') -Destination (Join-Path $mod 'common/icon.png')

@@ -16,7 +16,8 @@ foreach($file in $files){
         if($file.Name -in @('.git','build','installer','src','tests','secrets','private','.codex','.gradle')){throw 'Development directory in upload'}
         continue
     }
-    if($file.Name -match '(?i)(\.local\.|^\.env|private|secret|credential)' -or $file.Extension -notin @('.lua','.json','.info','.txt','.png','.jar','.zbs','.properties','.md')){throw "Unexpected upload file: $($file.Name)"}
+    $tool=$file.FullName.Substring($folder.Length+1).Replace('\','/') -eq 'Contents/mods/WorkshopSentinel/tools/BeforeServerStart.ps1'
+    if($file.Name -match '(?i)(\.local\.|^\.env|private|secret|credential)' -or (!$tool -and $file.Extension -notin @('.lua','.json','.info','.txt','.png','.jar','.zbs','.properties','.md'))){throw "Unexpected upload file: $($file.Name)"}
     $rel=$file.FullName.Substring($folder.Length+1).Replace('\','/')
     if($rel -notin @('workshop.txt','preview.png') -and !$rel.StartsWith('Contents/mods/WorkshopSentinel/') -and !$rel.StartsWith('Contents/mods/WorkshopSentinelClient/')){throw 'Unexpected upload location'}
 }

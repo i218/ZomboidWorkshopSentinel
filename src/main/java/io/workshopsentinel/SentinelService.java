@@ -20,6 +20,8 @@ public final class SentinelService implements AutoCloseable {
     private Set<String> lastConfigured, lastUpdates;
     private boolean shutdownPending;
     private final ShutdownAdapter shutdown;
+    private WorkshopStaging staging;
+    private volatile boolean keepStagingLeaseUntilJvmExit;
 
     public SentinelService(Config config, GameAdapter game, WorkshopUpdateProvider provider,
                            ShutdownAdapter shutdown, LongSupplier clock, Logger log) {
@@ -33,7 +35,9 @@ public final class SentinelService implements AutoCloseable {
             if (!shutdownPending) log.info("Shutdown suppressed by configuration; terminal RESTARTING simulation/request state");
         }, log);
         worker = Executors.newSingleThreadScheduledExecutor(r -> {
-            Thread t = new Thread(r, "WorkshopSentinel-IO"); t.setDaemon(true); return t;
+            Thread t = new Thread(()->{
+                try{r.run();}finally{if(staging!=null && !keepStagingLeaseUntilJvmExit)try{staging.close();}catch(java.io.IOException e){log.warning("Staging lock cleanup failed: "+e.getMessage());}}
+            }, "WorkshopSentinel-IO"); t.setDaemon(true); return t;
         });
         worker.scheduleAtFixedRate(() -> {
             if (closed) return;
@@ -53,6 +57,13 @@ public final class SentinelService implements AutoCloseable {
                 lastConfigured = new LinkedHashSet<>(ids); lastUpdates = new LinkedHashSet<>(found);
             } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
             catch (Exception e) { failures.failed("Workshop check", "Retry at the next scheduled check; pending update timer unchanged", e); }
+            if(config.staging.enabled && !config.dryRun && !closed)try {
+                if(staging==null)staging=WorkshopStaging.open(config,log);
+                Set<String> outdated=staging.refresh(config.configuredWorkshopIds());
+                if(!outdated.isEmpty())results.updateAndGet(old->{Set<String> merged=new LinkedHashSet<>(outdated);if(old!=null)merged.addAll(old);return Collections.unmodifiableSet(merged);});
+                failures.recovered("Workshop staging");
+            }catch(InterruptedException e){Thread.currentThread().interrupt();}
+            catch(Exception e){failures.failed("Workshop staging","Active files unchanged; retry at next check; pre-start validation is still required",e);}
         }, 0, config.checkSeconds, TimeUnit.SECONDS);
     }
     public void onTick() {
@@ -64,6 +75,9 @@ public final class SentinelService implements AutoCloseable {
         if (found != null) engine.found(found, now);
         engine.tick(now);
         if (engine.state() == SentinelEngine.State.RESTARTING) {
+            // A rejected shutdown may leave this server alive. Keep the lease until
+            // the OS closes JVM handles, not merely until monitoring has stopped.
+            keepStagingLeaseUntilJvmExit = true;
             close();
             if (shutdownPending) {
                 shutdownPending = false; // Exactly one request, even if adapter throws after partial success.

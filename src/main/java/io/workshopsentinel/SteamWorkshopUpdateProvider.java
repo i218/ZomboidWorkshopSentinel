@@ -53,6 +53,11 @@ public final class SteamWorkshopUpdateProvider implements WorkshopUpdateProvider
     }
     @Override public Set<String> check(Set<String> ids) throws Exception {
         if (ids.isEmpty()) return Collections.emptySet();
+        Map<String, Long> current = revisions(ids);
+        return compare(current);
+    }
+    /** Fresh, complete public metadata without changing the session baseline. */
+    public Map<String, Long> revisions(Set<String> ids) throws Exception {
         List<String> list = new ArrayList<>(ids);
         Map<String, Long> current = new LinkedHashMap<>();
         for (int start = 0; start < list.size(); start += 100) {
@@ -61,6 +66,9 @@ public final class SteamWorkshopUpdateProvider implements WorkshopUpdateProvider
             for (int i = 0; i < batch.size(); i++) body.append("&publishedfileids%5B").append(i).append("%5D=").append(batch.get(i));
             current.putAll(parse(transport.post(body.toString()), new LinkedHashSet<>(batch)));
         }
+        return current;
+    }
+    private Set<String> compare(Map<String, Long> current) {
         // Commit baselines only after ALL batches succeeded. Never acknowledge a pending update.
         Set<String> updates = new LinkedHashSet<>();
         for (Map.Entry<String, Long> item : current.entrySet()) {
