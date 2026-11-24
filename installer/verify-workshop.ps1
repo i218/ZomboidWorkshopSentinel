@@ -1,4 +1,4 @@
-param([Parameter(Mandatory=$true)][string]$Package)
+param([Parameter(Mandatory=$true)][string]$Package,[ValidateSet('public','friendsOnly','private')][string]$ExpectedVisibility)
 $ErrorActionPreference='Stop'
 function Get-Sha([string]$Path){
     $hash=[Security.Cryptography.SHA256]::Create()
@@ -28,6 +28,9 @@ if(Get-ChildItem -LiteralPath $coreLua -File -Recurse|Where-Object{$_.FullName -
 $metadata=Get-Content -LiteralPath (Join-Path $folder 'workshop.txt') -Encoding utf8
 foreach($key in @('version','title','tags','visibility')){if(@($metadata|Where-Object{$_.StartsWith($key+'=')}).Count -ne 1){throw "Missing/duplicate $key"}}
 if('version=1' -notin $metadata){throw 'Unsupported Workshop metadata version'}
+$visibility=@($metadata|Where-Object{$_.StartsWith('visibility=')})[0].Substring(11)
+if($visibility -notin @('public','friendsOnly','private')){throw 'Invalid Workshop visibility'}
+if($ExpectedVisibility -and $visibility -ne $ExpectedVisibility){throw "Expected Workshop visibility=$ExpectedVisibility; found $visibility"}
 $ids=@($metadata|Where-Object{$_.StartsWith('id=')});[UInt64]$id=0
 if($ids.Count -gt 1 -or ($ids.Count -eq 1 -and ($ids[0].Substring(3) -notmatch '^[1-9][0-9]{0,19}$' -or ![UInt64]::TryParse($ids[0].Substring(3),[ref]$id)))){throw 'Invalid Workshop ID'}
 Add-Type -AssemblyName System.Drawing

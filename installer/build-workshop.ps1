@@ -1,4 +1,4 @@
-param([string]$Destination,[switch]$Refresh)
+param([string]$Destination,[switch]$Refresh,[ValidateSet('public','friendsOnly','private')][string]$Visibility='public')
 $ErrorActionPreference='Stop'
 $root=Split-Path $PSScriptRoot -Parent
 $version=[regex]::Match([IO.File]::ReadAllText((Join-Path $root '42/mod.info')),'(?m)^modversion=([^\r\n]+)').Groups[1].Value.Trim()
@@ -56,8 +56,14 @@ foreach($mod in @($core,$client)){
 $metadata=Join-Path $root 'workshop/workshop.txt'
 if(Test-Path -LiteralPath $destinationFull){$metadata=Join-Path $destinationFull 'workshop.txt'}
 Copy-Item -LiteralPath $metadata -Destination (Join-Path $stage 'workshop.txt')
+$stagedMetadata=Join-Path $stage 'workshop.txt'
+$metadataText=[IO.File]::ReadAllText($stagedMetadata)
+if([regex]::Matches($metadataText,'(?m)^visibility=[^\r\n]*').Count -ne 1){throw 'Expected one Workshop visibility field'}
+# Publication identity/descriptions survive refresh; stale privacy is not inherited.
+$metadataText=[regex]::Replace($metadataText,'(?m)^visibility=[^\r\n]*',('visibility='+$Visibility))
+[IO.File]::WriteAllText($stagedMetadata,$metadataText,[Text.UTF8Encoding]::new($false))
 Copy-Item -LiteralPath (Join-Path $root 'workshop/preview.png') -Destination (Join-Path $stage 'preview.png')
-& (Join-Path $PSScriptRoot 'verify-workshop.ps1') -Package $stage
+& (Join-Path $PSScriptRoot 'verify-workshop.ps1') -Package $stage -ExpectedVisibility $Visibility
 if(Test-Path -LiteralPath $destinationFull){
     $archiveBase=[IO.Path]::GetFullPath((Join-Path (Split-Path $parent -Parent) 'WorkshopSentinelBackups/Workshop'))
     $archive=Join-Path $archiveBase ([guid]::NewGuid().ToString('N'))
