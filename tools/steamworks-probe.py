@@ -29,7 +29,7 @@ def emit(**value):
     print(json.dumps(value), flush=True)
 
 
-def download(root, depot):
+def download(root, depot, items, max_bytes, probe=False):
     api = c.CDLL(str(root / "steam_api64.dll"))
 
     def bind(name, result, *args):
@@ -73,6 +73,8 @@ def download(root, depot):
         free_callback = bind("SteamAPI_ManualDispatch_FreeLastCallback", None, integer)
         logged_on = bind("SteamAPI_ISteamGameServer_BLoggedOn", c.c_bool, ptr)
 
+        requested = None
+
         def pump():
             frame(pipe)
             message = Callback()
@@ -83,7 +85,7 @@ def download(root, depot):
                         emit(event="connection_callback", kind=message.kind, status=status)
                     if message.kind == 3406 and message.size >= c.sizeof(DownloadResult):
                         outcome = DownloadResult.from_address(message.data)
-                        if outcome.app == APP and outcome.item == ITEM:
+                        if outcome.app == APP and outcome.item == requested:
                             yield outcome.result
                 finally:
                     free_callback(pipe)
@@ -96,38 +98,45 @@ def download(root, depot):
                 raise RuntimeError("Anonymous Steam login timed out")
             time.sleep(.1)
         emit(event="anonymous_login")
-        if not bind("SteamAPI_ISteamUGC_DownloadItem", c.c_bool, ptr, item_id, c.c_bool)(ugc, ITEM, False):
-            raise RuntimeError("DownloadItem rejected the request")
-        until = time.monotonic() + 90
-        while True:
-            results = list(pump())
-            if results:
-                emit(event="download_callback", result=results[0])
-                if results[0] != 1:
-                    raise RuntimeError(f"DownloadItemResult={results[0]}")
-                break
-            if time.monotonic() >= until:
-                get_state = bind("SteamAPI_ISteamUGC_GetItemState", uint, ptr, item_id)
-                raise RuntimeError(f"Download callback timed out, item state={get_state(ugc, ITEM)}")
-            time.sleep(.1)
-        location, size, timestamp = c.create_string_buffer(4096), item_id(), uint()
+        request = bind("SteamAPI_ISteamUGC_DownloadItem", c.c_bool, ptr, item_id, c.c_bool)
+        progress = bind("SteamAPI_ISteamUGC_GetItemDownloadInfo", c.c_bool, ptr, item_id,
+                        c.POINTER(item_id), c.POINTER(item_id))
         install = bind("SteamAPI_ISteamUGC_GetItemInstallInfo", c.c_bool, ptr, item_id,
                        c.POINTER(item_id), ptr, uint, c.POINTER(uint))
-        if not install(ugc, ITEM, c.byref(size), location, len(location), c.byref(timestamp)):
-            raise RuntimeError("GetItemInstallInfo returned false")
-        path = Path(os.fsdecode(location.value)).resolve(strict=True)
-        if not path.is_relative_to(cache.resolve()):
-            raise RuntimeError(f"Steam reported an install path outside the test cache: {path}")
-        files = sorted(p for p in path.rglob("*") if p.is_file())
-        if not files or not size.value or not timestamp.value:
-            raise RuntimeError("Incomplete install information")
-        payload = [{"path": p.relative_to(path).as_posix(), "sha256": sha256(p)} for p in files]
-        file_bytes = sum(p.stat().st_size for p in files)
-        if file_bytes != size.value:
-            raise RuntimeError(f"Installed file size mismatch: {file_bytes} != {size.value}")
-        (root / "payload-sha256.json").write_text(json.dumps(payload, indent=2), encoding="utf-8")
-        emit(event="installed", path=str(path), steam_bytes=size.value,
-             file_bytes=file_bytes, timestamp=timestamp.value, file_count=len(files))
+        for requested in items:
+            if not request(ugc, requested, False):
+                raise RuntimeError(f"DownloadItem rejected item {requested}")
+            while True:
+                results = list(pump())
+                if results:
+                    emit(event="download_callback", item=requested, result=results[0])
+                    if results[0] != 1:
+                        raise RuntimeError(f"DownloadItemResult={results[0]} for item {requested}")
+                    break
+                received, total = item_id(), item_id()
+                if progress(ugc, requested, c.byref(received), c.byref(total)) and total.value > max_bytes:
+                    raise RuntimeError(f"Workshop item exceeds staging size limit: {requested}")
+                time.sleep(.1)
+            location, size, timestamp = c.create_string_buffer(4096), item_id(), uint()
+            if not install(ugc, requested, c.byref(size), location, len(location), c.byref(timestamp)):
+                raise RuntimeError(f"GetItemInstallInfo failed for {requested}")
+            path = Path(os.fsdecode(location.value)).resolve(strict=True)
+            if path != cache.resolve() / "content" / str(APP) / str(requested):
+                raise RuntimeError(f"Unexpected Workshop install path: {path}")
+            if not 0 < size.value <= max_bytes or not timestamp.value:
+                raise RuntimeError(f"Invalid install size or timestamp for {requested}")
+            if probe:
+                files = sorted(p for p in path.rglob("*") if p.is_file())
+                payload = [{"path": p.relative_to(path).as_posix(), "sha256": sha256(p)} for p in files]
+                file_bytes = sum(p.stat().st_size for p in files)
+                if file_bytes != size.value:
+                    raise RuntimeError(f"Installed file size mismatch: {file_bytes} != {size.value}")
+                (root / "payload-sha256.json").write_text(json.dumps(payload, indent=2), encoding="utf-8")
+                emit(event="installed", path=str(path), steam_bytes=size.value,
+                     file_bytes=file_bytes, timestamp=timestamp.value, file_count=len(files))
+            else:
+                with (root / "installed.tsv").open("a", encoding="ascii") as receipt:
+                    receipt.write(f"{requested}\t{size.value}\t{timestamp.value}\n")
     finally:
         if server:
             bind("SteamAPI_ISteamGameServer_LogOff", None, ptr)(server)
@@ -227,9 +236,17 @@ if __name__ == "__main__":
     parser.add_argument("--watch", action="append", type=Path, default=[])
     parser.add_argument("--depot", type=int, default=APP)
     parser.add_argument("--worker", action="store_true", help=argparse.SUPPRESS)
+    parser.add_argument("--items-file", type=Path, help=argparse.SUPPRESS)
+    parser.add_argument("--max-bytes", type=int, default=20 * 1024**3, help=argparse.SUPPRESS)
     options = parser.parse_args()
     if options.worker:
-        download(options.run_dir, options.depot)
+        items = [ITEM]
+        if options.items_file:
+            ids = options.items_file.read_text(encoding="ascii").splitlines()
+            if not ids or any(not re.fullmatch(r"[1-9][0-9]{0,19}", value) or int(value) >= 2**64 for value in ids):
+                parser.error("Invalid Workshop item list")
+            items = list(map(int, ids))
+        download(options.run_dir, options.depot, items, options.max_bytes, probe=options.items_file is None)
     else:
         if not options.dll or not options.watch:
             parser.error("--dll and at least one --watch cache are required")

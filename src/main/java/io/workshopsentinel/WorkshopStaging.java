@@ -10,14 +10,20 @@ import java.util.logging.Logger;
 /** Isolated download queue and an offline, journalled pre-start transaction. */
 public final class WorkshopStaging implements AutoCloseable {
     @FunctionalInterface public interface Revisions { Map<String,Long> read(Set<String> ids)throws Exception; }
-    @FunctionalInterface public interface Downloader { void download(Set<String> ids)throws Exception; }
+    @FunctionalInterface public interface Downloader { Download download(Set<String> ids)throws Exception; }
+    public static final class Download implements AutoCloseable {
+        final Path cache;
+        private final Runnable cleanup;
+        Download(Path cache, Runnable cleanup) { this.cache=cache;this.cleanup=cleanup; }
+        @Override public void close(){cleanup.run();}
+    }
     private final StagingSettings settings;
     private final Revisions remote;
     private final Downloader downloader;
     private final Logger log;
     private final FileChannel channel;
     private final FileLock lease;
-    private final Path acf, sourceWorkshop;
+    private final Path acf;
     // Test seam for interruption at durable transaction boundaries; never configured externally.
     interface Boundary {void reached(String phase)throws IOException;}
     Boundary boundary=phase->{};
@@ -27,9 +33,8 @@ public final class WorkshopStaging implements AutoCloseable {
         if(!settings.enabled)throw new IOException("Staging is disabled");
         StageFiles.noLinks(settings.root);StageFiles.noLinks(settings.workshop);
         acf=settings.workshop.resolve("appworkshop_108600.acf");WorkshopAcf.read(acf);
-        sourceWorkshop=settings.steamcmd.getParent().resolve("steamapps/workshop");
         Files.createDirectories(settings.root);
-        Path lock=settings.workshop.resolve(".workshopsentinel.lock");StageFiles.noLinks(lock);
+        Path lock=settings.workshop.resolveSibling("."+settings.workshop.getFileName()+".workshopsentinel.lock");StageFiles.noLinks(lock);
         channel=FileChannel.open(lock,StandardOpenOption.CREATE,StandardOpenOption.WRITE);
         FileLock obtained;
         try {obtained=channel.tryLock();if(obtained==null)throw new IOException("Workshop staging is already in use; server must be stopped before applying");}
@@ -38,7 +43,7 @@ public final class WorkshopStaging implements AutoCloseable {
     }
     static WorkshopStaging open(Config c,Logger log)throws IOException {
         SteamWorkshopUpdateProvider metadata=new SteamWorkshopUpdateProvider(c.timeoutSeconds,null,log);
-        return new WorkshopStaging(c.staging,metadata::revisions,new SteamCmdDownloader(c.staging),log);
+        return new WorkshopStaging(c.staging,metadata::revisions,new SteamworksDownloader(c.staging,log),log);
     }
     private Map<String,Long> revisions(Set<String> ids)throws Exception {
         Map<String,Long> result=remote.read(ids);
@@ -55,15 +60,16 @@ public final class WorkshopStaging implements AutoCloseable {
                 if(Files.exists(journal) && "PREPARED".equals(StageFiles.properties(journal).getProperty("phase")))
                     throw new IOException("Interrupted startup transaction: run pre-start recovery before staging");}
         }
-        prepare(ids,false);Map<String,Long> latest=revisions(ids);WorkshopAcf installed=WorkshopAcf.read(acf);
+        prepare(ids,false,false);Map<String,Long> latest=revisions(ids);WorkshopAcf installed=WorkshopAcf.read(acf);
         Set<String> outdated=new LinkedHashSet<>();for(String id:ids)
             if(!installed.items().containsKey(id) || installed.updated(id)<latest.get(id))outdated.add(id);
         return outdated;
     }
-    private Map<String,Path> prepare(Set<String> ids,boolean force)throws Exception {
+    private Map<String,Path> prepare(Set<String> ids,boolean startup,boolean rebuild)throws Exception {
         ids(ids);if(ids.isEmpty())return Map.of();
         Map<String,Long> before=revisions(ids);WorkshopAcf installed=WorkshopAcf.read(acf);
         Set<String> needed=new LinkedHashSet<>();
+        Map<String,Path> bundles=new LinkedHashMap<>();
         Properties pending=new Properties();Path index=settings.root.resolve("pending.properties");
         if(Files.exists(index))try{pending=StageFiles.properties(index);}
         catch(StageFiles.CorruptMetadata corrupt){
@@ -73,37 +79,42 @@ public final class WorkshopStaging implements AutoCloseable {
             log.warning("Corrupt staging queue index quarantined; fresh Steam validation required");
         }
         for(String id:ids){
-            if(force){needed.add(id);continue;}
-            if(installed.items().containsKey(id) && installed.updated(id)>=before.get(id))continue;
+            if(rebuild){needed.add(id);continue;}
+            if(!startup && installed.items().containsKey(id) && installed.updated(id)>=before.get(id))continue;
             String queued=pending.getProperty(id);boolean ready=false;
             if(queued!=null){
                 try {
-                    Path bundle=bundle(id,queued);Properties manifest=StageFiles.properties(bundle.resolve("receipt.properties"));
+                    Path bundle=bundle(id,queued);
+                    Properties manifest=startup?verify(bundle,id):StageFiles.properties(bundle.resolve("receipt.properties"));
                     ready=Long.toString(before.get(id)).equals(manifest.getProperty("steamUpdated"));
-                }catch(StageFiles.CorruptMetadata corrupt){log.warning("Corrupt staged receipt for "+id+"; downloading a fresh generation");}
+                    if(ready && startup)bundles.put(id,bundle);
+                }catch(IOException invalid){
+                    log.warning("Unusable staged item "+id+"; downloading a fresh generation: "+invalid.getMessage());
+                }
             }
             if(!ready)needed.add(id);
         }
-        if(needed.isEmpty())return Map.of();
-        downloader.download(needed);
-        Map<String,Long> after=revisions(needed);WorkshopAcf downloaded=WorkshopAcf.read(sourceWorkshop.resolve("appworkshop_108600.acf"));
-        Map<String,Path> bundles=new LinkedHashMap<>();
-        for(String id:needed){
-            if(!before.get(id).equals(after.get(id)))throw new Changed("Steam changed during download: "+id);
-            downloaded.verified(id,after.get(id));
-            String generation=UUID.randomUUID().toString();Path bundle=bundle(id,generation);
-            StageFiles.copy(sourceWorkshop.resolve("content/108600").resolve(id),bundle.resolve("content"),settings.maxBytes);
-            Properties receipt=new Properties();receipt.setProperty("schema","1");receipt.setProperty("id",id);
-            receipt.setProperty("manifest",downloaded.manifest(id));receipt.setProperty("steamUpdated",after.get(id).toString());
-            receipt.setProperty("downloadedAt",Instant.now().toString());receipt.setProperty("verifiedAt",Instant.now().toString());
-            for(Map.Entry<String,String> file:StageFiles.inventory(bundle.resolve("content"),settings.maxBytes).entrySet())receipt.setProperty("sha256."+file.getKey(),file.getValue());
-            StageFiles.properties(bundle.resolve("receipt.properties"),receipt);
-            // Preserve only this item's validated native metadata, not the downloader's entire cache.
-            StageFiles.atomic(bundle.resolve("steam.acf"),downloaded.encode());
-            verify(bundle,id);bundles.put(id,bundle);pending.setProperty(id,generation);
+        if(needed.isEmpty())return bundles;
+        try (Download download=downloader.download(needed)) {
+            Path sourceWorkshop=download.cache;
+            Map<String,Long> after=revisions(needed);WorkshopAcf downloaded=WorkshopAcf.read(sourceWorkshop.resolve("appworkshop_108600.acf"));
+            for(String id:needed){
+                if(!before.get(id).equals(after.get(id)))throw new Changed("Steam changed during download: "+id);
+                downloaded.verified(id,after.get(id));
+                String generation=UUID.randomUUID().toString();Path bundle=bundle(id,generation);
+                StageFiles.copy(sourceWorkshop.resolve("content/108600").resolve(id),bundle.resolve("content"),settings.maxBytes);
+                Properties receipt=new Properties();receipt.setProperty("schema","1");receipt.setProperty("id",id);
+                receipt.setProperty("manifest",downloaded.manifest(id));receipt.setProperty("steamUpdated",after.get(id).toString());
+                receipt.setProperty("downloadedAt",Instant.now().toString());receipt.setProperty("verifiedAt",Instant.now().toString());
+                for(Map.Entry<String,String> file:StageFiles.inventory(bundle.resolve("content"),settings.maxBytes).entrySet())receipt.setProperty("sha256."+file.getKey(),file.getValue());
+                StageFiles.properties(bundle.resolve("receipt.properties"),receipt);
+                // Preserve only this item's validated native metadata, not the downloader's entire cache.
+                StageFiles.atomic(bundle.resolve("steam.acf"),downloaded.encode());
+                verify(bundle,id);bundles.put(id,bundle);pending.setProperty(id,generation);
+            }
+            StageFiles.properties(settings.root.resolve("pending.properties"),pending);
+            log.info("Workshop staging prepared: items="+needed.size()+"; active files unchanged");return bundles;
         }
-        StageFiles.properties(settings.root.resolve("pending.properties"),pending);
-        log.info("Workshop staging prepared: items="+needed.size()+"; active files unchanged");return bundles;
     }
     private Path bundle(String id,String generation)throws IOException {
         if(!generation.matches("[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}"))throw new IOException("Invalid staging generation");
@@ -125,8 +136,8 @@ public final class WorkshopStaging implements AutoCloseable {
         ids(ids);recover();
         for(int attempt=1;attempt<=3;attempt++){
             try {
-                // Always ask SteamCMD to validate again, including same-second manifest changes.
-                Map<String,Path> bundles=prepare(ids,true);
+                // Use fresh Steamworks metadata even for same-second manifest changes.
+                Map<String,Path> bundles=prepare(ids,true,attempt>1);
                 if(!ids.isEmpty())apply(bundles,ids);
                 return;
             }catch(Changed changed){log.warning(changed.getMessage()+"; startup retry "+attempt+"/3");if(attempt==3)throw changed;}
@@ -135,12 +146,17 @@ public final class WorkshopStaging implements AutoCloseable {
     private void apply(Map<String,Path> bundles,Set<String> ids)throws Exception {
         Map<String,Long> latest=revisions(ids);WorkshopAcf target=WorkshopAcf.read(acf);String originalHash=StageFiles.hash(acf);
         // Confirm native manifest identities again; timestamp alone is not a version identifier.
-        downloader.download(ids);WorkshopAcf fresh=WorkshopAcf.read(sourceWorkshop.resolve("appworkshop_108600.acf"));
+        WorkshopAcf fresh;
+        try (Download download=downloader.download(ids)) {
+            fresh=WorkshopAcf.read(download.cache.resolve("appworkshop_108600.acf"));
+        }
         Path transaction=settings.workshop.resolve(".workshopsentinel-txn-"+UUID.randomUUID());StageFiles.noLinks(transaction);Files.createDirectories(transaction);
         Properties journal=new Properties();journal.setProperty("schema","1");journal.setProperty("phase","PREPARED");journal.setProperty("ids",String.join(";",ids));
         Map<String,Map<String,String>> expectedFiles=new LinkedHashMap<>();Set<String> changed=new LinkedHashSet<>();
         for(String id:ids){
-            Properties receipt=verify(bundles.get(id),id);fresh.verified(id,latest.get(id));
+            Properties receipt=verify(bundles.get(id),id);
+            if(fresh.updated(id)!=latest.get(id))throw new Changed("Steam timestamp changed before apply: "+id);
+            fresh.verified(id,latest.get(id));
             long staged=Long.parseLong(receipt.getProperty("steamUpdated"));
             if(staged!=latest.get(id) || !receipt.getProperty("manifest").equals(fresh.manifest(id)))throw new Changed("Prepared revision is no longer latest: "+id);
             if(target.items().containsKey(id) && target.updated(id)>staged)throw new IOException("Refusing to downgrade installed Workshop item: "+id);

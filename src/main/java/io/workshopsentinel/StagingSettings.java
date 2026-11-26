@@ -6,25 +6,25 @@ import java.util.*;
 /** Explicit opt-in; the public mod never writes Workshop content by default. */
 public final class StagingSettings {
     public final boolean enabled;
-    public final Path root, steamcmd, workshop;
+    public final Path root, steamworksLibrary, workshop;
+    public final String python;
     public final long timeoutSeconds, maxBytes;
     StagingSettings(Properties p, Path directory) {
         String enabledValue=p.getProperty("stagingEnabled","false").trim();
         if(!Set.of("true","false").contains(enabledValue))throw new IllegalArgumentException("stagingEnabled must be true or false");
         enabled=Boolean.parseBoolean(enabledValue);
         root=resolve(directory,p.getProperty("stagingDirectory","staged-workshop"));
-        String command=p.getProperty("stagingSteamCmd","").trim();
-        if(command.isEmpty())command=System.getProperty("os.name").startsWith("Windows")?"steamcmd/steamcmd.exe":"steamcmd/steamcmd.sh";
-        steamcmd=resolve(root,command);
+        python=p.getProperty("stagingPython","").trim();
+        String library=p.getProperty("stagingSteamworksLibrary","").trim();
+        steamworksLibrary=library.isEmpty()?null:resolve(directory,library);
         String target=p.getProperty("stagingWorkshopDirectory","").trim();
         workshop=target.isEmpty()?null:resolve(directory,target);
         timeoutSeconds=Long.parseLong(p.getProperty("stagingDownloadTimeoutSeconds","1800").trim());
         maxBytes=Long.parseLong(p.getProperty("stagingMaxItemBytes","21474836480").trim());
         if(timeoutSeconds<10 || timeoutSeconds>14400 || maxBytes<1 || maxBytes>1099511627776L)
             throw new IllegalArgumentException("Invalid staging limit");
-        if(enabled && (workshop==null || workshop.startsWith(root) || root.startsWith(workshop)
-            || !steamcmd.getParent().equals(root.resolve("steamcmd"))))
-            throw new IllegalArgumentException("Staging needs a separate Workshop root and a dedicated SteamCMD inside stagingDirectory/steamcmd");
+        if(enabled && (workshop==null || workshop.startsWith(root) || root.startsWith(workshop)))
+            throw new IllegalArgumentException("Staging needs a separate Workshop root");
     }
     private static Path resolve(Path base,String value) {
         if(value.trim().isEmpty())throw new IllegalArgumentException("Empty staging path");

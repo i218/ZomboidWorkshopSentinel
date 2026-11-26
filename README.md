@@ -52,9 +52,9 @@ The package is ready for local installation. It has not been published to Steam 
 
 Workshop authoring packages default to `visibility=public`, including refreshes of an existing private/friends-only draft. ID, descriptions and other metadata are retained. Non-public builds require an explicit `-Visibility private` or `-Visibility friendsOnly` override.
 
-## Optional isolated Workshop downloads (0.6.0)
+## Optional isolated Workshop downloads (0.6.1)
 
-Staging is disabled by default. When explicitly enabled, a dedicated SteamCMD downloads into a separate directory. A required pre-start check validates Steam timestamps, manifest IDs and SHA-256 receipts before replacing server content and ACF entries, with rollback/recovery. It never launches the server. See [setup and guarantees](docs/STAGING.md); a startup-script change and a separate SteamCMD installation are required.
+Staging is disabled by default. On Windows x64, an anonymous Steamworks process downloads into a separate cache. The required pre-start check verifies the current manifest ID and staged files before applying changes. See [setup and verification](docs/STAGING.md).
 
 ## Client update checking
 
